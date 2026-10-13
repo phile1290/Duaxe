@@ -1,0 +1,6 @@
+{
+  "name": "Đua Xe Tri Thức 3D - Quiz Racing AI",
+  "description": "Ứng dụng web trò chơi trắc nghiệm đua xe 3D cho học sinh tiểu học, tích hợp Google Gemini AI trích xuất sách giáo khoa và hệ thống điểm số 35 tuần",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
