@@ -69,7 +69,7 @@ export const WeeklyLeaderboard: React.FC = () => {
             >
               {CURRICULUM_WEEKS.map((w) => (
                 <option key={w.week} value={w.week} className="bg-slate-900 text-white">
-                  Tuần {w.week} ({w.term} - {w.subject})
+                  Tuần {w.week}
                 </option>
               ))}
             </select>

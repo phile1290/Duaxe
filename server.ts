@@ -17,6 +17,16 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+  // Comprehensive CORS and frame headers for AI Studio and external previews
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.removeHeader('X-Frame-Options');
+    next();
+  });
+
   // Initialize Gemini AI Client with telemetry header
   const geminiApiKey = process.env.GEMINI_API_KEY || '';
   let ai: GoogleGenAI | null = null;

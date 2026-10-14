@@ -14,11 +14,12 @@ import {
   GraduationCap,
   Calendar,
   Settings,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { SettingsModal } from '../SettingsModal';
 
 export const TeacherDashboard: React.FC = () => {
-  const { currentClass, selectedWeek, setViewMode, isSettingsOpen, openSettings, closeSettings } = useGameStore();
+  const { currentClass, selectedWeek, setViewMode, isSettingsOpen, openSettings, closeSettings, openSetup } = useGameStore();
 
   const [activeTab, setActiveTab] = useState<'ai' | 'students' | 'leaderboard' | 'architecture'>('ai');
 
@@ -47,21 +48,34 @@ export const TeacherDashboard: React.FC = () => {
               <span>•</span>
               <span>{currentClass.teacherName}</span>
               <span>•</span>
-              <span className="text-amber-400 font-bold">Tuần {selectedWeek}/35</span>
+              <span className="text-amber-400 font-bold">Tuần {selectedWeek}</span>
             </p>
           </div>
         </div>
 
-        {/* Action Buttons: Settings Gear + Classroom Game Mode */}
-        <div className="flex items-center gap-2.5">
+        {/* Action Buttons: Settings Gear + Setup + Classroom Game Mode */}
+        <div className="flex items-center gap-2">
           {/* Settings Gear Button */}
           <button
             onClick={openSettings}
             title="Cài đặt khóa API Gemini"
-            className="p-2.5 sm:px-3.5 sm:py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer shadow-md"
+            className="p-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 flex items-center gap-1.5 text-xs font-bold transition-colors cursor-pointer shadow-md"
           >
             <Settings className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">Cài Đặt API</span>
+            <span className="hidden lg:inline">Cài Đặt API</span>
+          </button>
+
+          {/* Setup Race Button */}
+          <button
+            onClick={() => {
+              setViewMode('classroom');
+              openSetup();
+            }}
+            title="Thiết lập bài học, PDF và danh sách đua"
+            className="py-2.5 px-3 sm:px-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            <span className="hidden sm:inline">Thiết Lập Bài & Đội</span>
           </button>
 
           <button

@@ -1,5 +1,7 @@
 export type SubjectType = 'Toán' | 'Tiếng Việt' | 'Khoa học' | 'Lịch sử & Địa lí' | 'Tiếng Anh';
 
+export type GameMode = 'team' | 'individual';
+
 export interface Question {
   id: string;
   question: string;
@@ -8,7 +10,7 @@ export interface Question {
   explanation: string;
   visualType?: 'math_shape' | 'diagram' | 'emoji_icon' | 'badge' | 'animal' | 'clock';
   visualPrompt?: string;
-  visualData?: string; // SVG or icon code
+  visualData?: string;
   points?: number;
 }
 
@@ -50,13 +52,26 @@ export interface Student {
   totalCorrect: number;
   totalWrong: number;
   highestCombo: number;
-  // Map of week 1 -> 35
   weeklyScores: Record<number, {
     score: number;
     correctCount: number;
     wrongCount: number;
     lastPlayedDate?: string;
   }>;
+}
+
+export interface Racer {
+  id: string;
+  name: string; // Tên học sinh hoặc tên đội
+  subInfo?: string; // Mã học sinh hoặc nhóm
+  colorHex: string;
+  carNumber: number;
+  progress: number; // 0 to 100%
+  score: number;
+  combo: number;
+  isNitro: boolean;
+  avatar: string;
+  lane: number;
 }
 
 export interface ClassRoom {
@@ -68,14 +83,22 @@ export interface ClassRoom {
   teams: Team[];
 }
 
-export interface RaceCarState {
-  lane: number;
-  distance: number; // 0.0 to 100.0 (progress along track)
-  speed: number;
-  targetDistance: number;
-  isSliding: boolean;
-  isNitro: boolean;
-  consecutiveCorrect: number;
+export interface RaceSetupConfig {
+  weekNumber: number; // 1 to 35
+  lessonTitle: string;
+  subject: SubjectType;
+  grade: number;
+  className?: string;
+  gameMode: GameMode;
+  questionCount: number;
+  studentsText: string;
+  teamsConfig: {
+    teamId: string;
+    teamName: string;
+    studentNames: string[];
+  }[];
+  pdfFileName?: string;
+  pdfBase64?: string | null;
 }
 
 export interface LeaderboardEntry {
