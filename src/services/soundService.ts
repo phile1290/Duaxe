@@ -1,6 +1,9 @@
 class SoundSynthesizer {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
+  private bgmTimer: number | null = null;
+  private isBgmPlaying: boolean = false;
+  private activeNodes: AudioNode[] = [];
 
   private getContext(): AudioContext | null {
     if (this.isMuted) return null;
@@ -18,6 +21,9 @@ class SoundSynthesizer {
 
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
+    if (this.isMuted) {
+      this.stopCelebrationMusic();
+    }
     return this.isMuted;
   }
 
@@ -25,7 +31,11 @@ class SoundSynthesizer {
     return this.isMuted;
   }
 
-  // Tiếng động cơ xe nổ ga (Engine rev)
+  public isCelebrationMusicPlaying(): boolean {
+    return this.isBgmPlaying && !this.isMuted;
+  }
+
+  // Tiếng động cơ / xuất phát hào hứng
   public playEngineRev(): void {
     const ctx = this.getContext();
     if (!ctx) return;
@@ -33,7 +43,7 @@ class SoundSynthesizer {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sawtooth';
-      
+
       const now = ctx.currentTime;
       osc.frequency.setValueAtTime(80, now);
       osc.frequency.exponentialRampToValueAtTime(220, now + 0.2);
@@ -79,7 +89,7 @@ class SoundSynthesizer {
     } catch (e) {}
   }
 
-  // Tiếng trả lời sai & trượt lốp (Buzzer + Skid)
+  // Tiếng trả lời sai
   public playWrong(): void {
     const ctx = this.getContext();
     if (!ctx) return;
@@ -103,14 +113,13 @@ class SoundSynthesizer {
     } catch (e) {}
   }
 
-  // Hiệu ứng NITRO TĂNG TỐC (Whoosh + Frequency rocket roar)
+  // Hiệu ứng COMBO TĂNG TỐC
   public playNitro(): void {
     const ctx = this.getContext();
     if (!ctx) return;
     try {
       const now = ctx.currentTime;
-      
-      // Tone sweep
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
@@ -126,7 +135,6 @@ class SoundSynthesizer {
       osc.start(now);
       osc.stop(now + 0.8);
 
-      // Noise burst for rocket fire
       const bufferSize = ctx.sampleRate * 0.6;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
@@ -154,40 +162,166 @@ class SoundSynthesizer {
     } catch (e) {}
   }
 
-  // Kèn chiến thắng (Victory Fanfare)
+  // Kèn chiến thắng (Victory Fanfare) + Khởi động nhạc nền sôi động
   public playVictory(): void {
+    this.startCelebrationMusic();
+  }
+
+  // Nhạc nền chiến thắng sôi động (Upbeat Celebration Fanfare & Dance Loop)
+  public startCelebrationMusic(): void {
+    this.stopCelebrationMusic();
+    if (this.isMuted) return;
+
     const ctx = this.getContext();
     if (!ctx) return;
-    try {
-      const melody = [
-        { f: 523.25, d: 0.15 },
-        { f: 523.25, d: 0.15 },
-        { f: 523.25, d: 0.15 },
-        { f: 659.25, d: 0.4 },
-        { f: 783.99, d: 0.4 },
-        { f: 1046.5, d: 0.8 },
-      ];
 
-      let t = ctx.currentTime;
-      melody.forEach((note) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
+    this.isBgmPlaying = true;
 
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(note.f, t);
+    const playLoopIteration = () => {
+      if (!this.isBgmPlaying || this.isMuted) return;
+      const audioCtx = this.getContext();
+      if (!audioCtx) return;
 
-        gain.gain.setValueAtTime(0.25, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + note.d);
+      try {
+        const now = audioCtx.currentTime + 0.03;
+        const step = 0.22; // ~136 BPM upbeat tempo (16 steps = 3.52s per bar loop)
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
+        // Giai điệu chính hào hứng, tươi vui (C major -> G major -> A minor -> F major -> G major -> C major)
+        const leadNotes: { stepIdx: number; freq: number; dur: number }[] = [
+          // Bar 1: C Major fanfare
+          { stepIdx: 0, freq: 523.25, dur: 0.18 },  // C5
+          { stepIdx: 1, freq: 659.25, dur: 0.18 },  // E5
+          { stepIdx: 2, freq: 783.99, dur: 0.18 },  // G5
+          { stepIdx: 3, freq: 1046.5, dur: 0.38 },  // C6
+          { stepIdx: 5, freq: 783.99, dur: 0.18 },  // G5
+          { stepIdx: 6, freq: 1046.5, dur: 0.38 },  // C6
+          // Bar 2: F & G uplifting progression
+          { stepIdx: 8, freq: 880.0, dur: 0.2 },    // A5
+          { stepIdx: 9, freq: 1046.5, dur: 0.2 },   // C6
+          { stepIdx: 10, freq: 987.77, dur: 0.2 },  // B5
+          { stepIdx: 11, freq: 783.99, dur: 0.2 },  // G5
+          { stepIdx: 12, freq: 1174.66, dur: 0.22 },// D6
+          { stepIdx: 13, freq: 987.77, dur: 0.2 },  // B5
+          { stepIdx: 14, freq: 1046.5, dur: 0.42 }, // C6
+        ];
 
-        osc.start(t);
-        osc.stop(t + note.d);
+        // Bassline sôi động
+        const bassNotes: { stepIdx: number; freq: number; dur: number }[] = [
+          { stepIdx: 0, freq: 130.81, dur: 0.35 },  // C3
+          { stepIdx: 2, freq: 196.0, dur: 0.35 },   // G3
+          { stepIdx: 4, freq: 130.81, dur: 0.35 },  // C3
+          { stepIdx: 6, freq: 196.0, dur: 0.35 },   // G3
+          { stepIdx: 8, freq: 174.61, dur: 0.35 },  // F3
+          { stepIdx: 10, freq: 196.0, dur: 0.35 },  // G3
+          { stepIdx: 12, freq: 196.0, dur: 0.35 },  // G3
+          { stepIdx: 14, freq: 130.81, dur: 0.4 },  // C3
+        ];
 
-        t += note.d + 0.05;
-      });
-    } catch (e) {}
+        // Hợp âm đệm rộn ràng (Chords)
+        const chordHits: { stepIdx: number; freqs: number[]; dur: number }[] = [
+          { stepIdx: 0, freqs: [261.63, 329.63, 392.0], dur: 0.35 },
+          { stepIdx: 3, freqs: [261.63, 329.63, 392.0], dur: 0.3 },
+          { stepIdx: 6, freqs: [261.63, 329.63, 392.0], dur: 0.35 },
+          { stepIdx: 8, freqs: [349.23, 440.0, 523.25], dur: 0.35 },
+          { stepIdx: 11, freqs: [392.0, 493.88, 587.33], dur: 0.3 },
+          { stepIdx: 14, freqs: [261.63, 329.63, 523.25], dur: 0.4 },
+        ];
+
+        // Phát Lead Melody
+        leadNotes.forEach((n) => {
+          const t = now + n.stepIdx * step;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(n.freq, t);
+
+          gain.gain.setValueAtTime(0.001, t);
+          gain.gain.linearRampToValueAtTime(0.18, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + n.dur);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(t);
+          osc.stop(t + n.dur + 0.02);
+          this.activeNodes.push(osc);
+        });
+
+        // Phát Bassline
+        bassNotes.forEach((b) => {
+          const t = now + b.stepIdx * step;
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(b.freq, t);
+
+          gain.gain.setValueAtTime(0.001, t);
+          gain.gain.linearRampToValueAtTime(0.1, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + b.dur);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(t);
+          osc.stop(t + b.dur + 0.02);
+          this.activeNodes.push(osc);
+        });
+
+        // Phát Chords
+        chordHits.forEach((c) => {
+          const t = now + c.stepIdx * step;
+          c.freqs.forEach((f) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, t);
+
+            gain.gain.setValueAtTime(0.001, t);
+            gain.gain.linearRampToValueAtTime(0.06, t + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + c.dur);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(t);
+            osc.stop(t + c.dur + 0.02);
+            this.activeNodes.push(osc);
+          });
+        });
+
+        // Nhịp trống vui nhộn (Kick & Hi-hat mỗi nhịp)
+        for (let i = 0; i < 16; i += 2) {
+          const t = now + i * step;
+          const kickOsc = audioCtx.createOscillator();
+          const kickGain = audioCtx.createGain();
+          kickOsc.type = 'sine';
+          kickOsc.frequency.setValueAtTime(130, t);
+          kickOsc.frequency.exponentialRampToValueAtTime(42, t + 0.12);
+          kickGain.gain.setValueAtTime(0.16, t);
+          kickGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+          kickOsc.connect(kickGain);
+          kickGain.connect(audioCtx.destination);
+          kickOsc.start(t);
+          kickOsc.stop(t + 0.15);
+          this.activeNodes.push(kickOsc);
+        }
+      } catch (e) {}
+    };
+
+    playLoopIteration();
+    this.bgmTimer = window.setInterval(playLoopIteration, 3520);
+  }
+
+  public stopCelebrationMusic(): void {
+    this.isBgmPlaying = false;
+    if (this.bgmTimer !== null) {
+      clearInterval(this.bgmTimer);
+      this.bgmTimer = null;
+    }
+    this.activeNodes.forEach((node) => {
+      try {
+        (node as OscillatorNode).stop?.();
+        node.disconnect();
+      } catch {}
+    });
+    this.activeNodes = [];
   }
 }
 

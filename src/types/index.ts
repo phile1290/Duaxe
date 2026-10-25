@@ -1,6 +1,8 @@
-export type SubjectType = 'Toán' | 'Tiếng Việt' | 'Khoa học' | 'Lịch sử & Địa lí' | 'Tiếng Anh';
+export type SubjectType = string;
 
 export type GameMode = 'team' | 'individual';
+
+export type VisualDisplayMode = 'question_image' | 'options_image' | 'text_only';
 
 export interface Question {
   id: string;
@@ -8,9 +10,37 @@ export interface Question {
   options: string[];
   correctIndex: number;
   explanation: string;
-  visualType?: 'math_shape' | 'diagram' | 'emoji_icon' | 'badge' | 'animal' | 'clock';
+  /**
+   * Nguyên tắc bắt buộc:
+   * - 'question_image': Câu hỏi hiển thị hình ảnh minh họa -> 4 đáp án A, B, C, D chỉ hiển thị VĂN BẢN.
+   * - 'options_image': 4 đáp án A, B, C, D là các hình ảnh đồng nhất -> Câu hỏi chỉ hiển thị VĂN BẢN.
+   * - 'text_only': Câu hỏi lý thuyết thuần văn bản (không ép hiển thị hình ảnh sai nội dung).
+   */
+  visualDisplayMode?: VisualDisplayMode;
+  visualType?:
+    | 'math_shape'
+    | 'diagram'
+    | 'emoji_icon'
+    | 'badge'
+    | 'animal'
+    | 'clock'
+    | 'number_line'
+    | 'fraction'
+    | 'balance_scale'
+    | 'experiment'
+    | 'computer_hardware'
+    | 'software_icon'
+    | 'none';
   visualPrompt?: string;
   visualData?: string;
+  visualKey?: string;
+  questionSvg?: string;
+  /**
+   * Hình ảnh minh họa cho 4 đáp án A, B, C, D (chỉ hiển thị khi visualDisplayMode === 'options_image').
+   * Khi một đáp án có hình ảnh thì TẤT CẢ 4 đáp án đều phải có hình ảnh để đảm bảo sự đồng nhất, và khi đó câu hỏi là văn bản.
+   */
+  optionVisuals?: string[];
+  optionSvgs?: string[];
   points?: number;
 }
 
@@ -19,10 +49,33 @@ export interface QuizSet {
   weekNumber: number; // 1 to 35
   lessonTitle: string;
   subject: SubjectType;
-  grade: number; // 1 - 5
+  grade?: number;
+  className?: string;
   description?: string;
   questions: Question[];
   createdAt: string;
+}
+
+export interface WeeklyScoreRecord {
+  score: number;
+  correctCount: number;
+  wrongCount: number;
+  hooksClimbed?: number;
+  totalTimeSec?: number; // Tổng số giây trả lời câu hỏi
+  callCount?: number; // Số lần được gọi ngẫu nhiên
+  lastPlayedDate?: string;
+}
+
+export interface SessionStudentRecord {
+  studentName: string;
+  teamId: string;
+  teamName: string;
+  teamColor: string;
+  score: number;
+  correctCount: number;
+  wrongCount: number;
+  totalTimeSec: number;
+  callCount: number;
 }
 
 export interface Team {
@@ -38,6 +91,7 @@ export interface Team {
   nitroRemainingSec: number;
   studentIds: string[];
   avatar: string;
+  weeklyScores?: Record<number, WeeklyScoreRecord>;
 }
 
 export interface Student {
@@ -51,13 +105,9 @@ export interface Student {
   cumulativeScore: number;
   totalCorrect: number;
   totalWrong: number;
+  totalTimeSec?: number;
   highestCombo: number;
-  weeklyScores: Record<number, {
-    score: number;
-    correctCount: number;
-    wrongCount: number;
-    lastPlayedDate?: string;
-  }>;
+  weeklyScores: Record<number, WeeklyScoreRecord>;
 }
 
 export interface Racer {
@@ -66,11 +116,19 @@ export interface Racer {
   subInfo?: string; // Mã học sinh hoặc nhóm
   colorHex: string;
   carNumber: number;
-  progress: number; // 0 to 100%
+  progress: number; // 0 to 100% (hookLevel * 10)
+  hookLevel: number; // 0 to 10 (10 móc trên dây thừng rừng cổ thụ)
   score: number;
+  correctCount?: number; // Số câu trả lời đúng trong lượt chơi
+  wrongCount?: number; // Số câu trả lời sai trong lượt chơi
+  totalTimeSec?: number; // Tổng số GIÂY trả lời trong lượt chơi (dùng để phân định thắng thua khi ngang điểm)
+  callCount?: number; // Số lần được Bà Già bắt trúng ngẫu nhiên trong lượt chơi
   combo: number;
   isNitro: boolean;
   avatar: string;
+  animalName?: string;
+  memberNames?: string[]; // Danh sách họ và tên học sinh trong đội (để Bà Già Chống Gậy bắt gà con)
+  weeklyScores?: Record<number, WeeklyScoreRecord>;
   lane: number;
 }
 
@@ -87,7 +145,7 @@ export interface RaceSetupConfig {
   weekNumber: number; // 1 to 35
   lessonTitle: string;
   subject: SubjectType;
-  grade: number;
+  grade?: number;
   className?: string;
   gameMode: GameMode;
   questionCount: number;
@@ -110,6 +168,30 @@ export interface LeaderboardEntry {
   rollNumber: string;
   weeklyScore: number;
   cumulativeScore: number;
+  rangeScore: number;
+  rangeCorrect: number;
+  rangeWrong: number;
+  rangeHooks: number;
+  rangeTimeSec: number;
+  weeklyBreakdown: Record<number, WeeklyScoreRecord>;
   highestCombo: number;
+  accuracy: number;
+}
+
+export interface TeamLeaderboardEntry {
+  rank: number;
+  teamId: string;
+  teamName: string;
+  teamColor: string;
+  avatar: string;
+  memberCount: number;
+  weeklyScore: number;
+  cumulativeScore: number;
+  rangeScore: number;
+  rangeCorrect: number;
+  rangeWrong: number;
+  rangeHooks: number;
+  rangeTimeSec: number;
+  weeklyBreakdown: Record<number, WeeklyScoreRecord>;
   accuracy: number;
 }

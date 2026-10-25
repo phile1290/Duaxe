@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { Student } from '../../types';
 import {
   Users,
   UserPlus,
   Upload,
   Download,
   Shuffle,
-  Trash2,
-  ShieldAlert,
   CheckCircle,
   FileSpreadsheet,
 } from 'lucide-react';
@@ -75,7 +72,7 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'mau_danh_sach_hoc_sinh_3a.csv');
+    link.setAttribute('download', 'mau_danh_sach_hoc_sinh.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -105,13 +102,12 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
 
   return (
     <div className="space-y-6">
-      
       {/* Top Banner & Quick Actions */}
       <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl">
         <div>
           <div className="text-xs uppercase font-bold text-amber-400 mb-1 flex items-center gap-1.5">
             <Users className="w-4 h-4" />
-            <span>Quản Lý Học Sinh & Chia Nhóm Đua</span>
+            <span>Quản Lý Học Sinh & Phân Đội Thú Hoang Leo Dây Thừng</span>
           </div>
           <h2 className="text-2xl font-black text-white">
             {currentClass.name} • Tổng cộng {students.length} học sinh
@@ -123,7 +119,6 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
 
         {/* Buttons */}
         <div className="flex flex-wrap gap-2.5">
-          {/* Download Sample CSV */}
           <button
             onClick={handleDownloadSampleCsv}
             className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 flex items-center gap-1.5 cursor-pointer"
@@ -132,14 +127,12 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
             <span>Tải CSV Mẫu</span>
           </button>
 
-          {/* Import CSV */}
           <label className="px-3.5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md">
             <Upload className="w-4 h-4" />
             <span>Nhập File Excel/CSV</span>
             <input type="file" accept=".csv" onChange={handleCsvFileUpload} className="hidden" />
           </label>
 
-          {/* Auto Balance */}
           <button
             onClick={handleAutoBalanceTeams}
             className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-md"
@@ -148,7 +141,6 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
             <span>Tự Động Cân Bằng Đội</span>
           </button>
 
-          {/* Export Full CSV */}
           <button
             onClick={handleExportFullCsv}
             className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-md"
@@ -166,7 +158,7 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
         </div>
       )}
 
-      {/* 4 Team Cards Overview */}
+      {/* Team Cards Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {currentClass.teams.map((team) => {
           const teamStudents = students.filter((s) => s.teamId === team.id);
@@ -205,8 +197,6 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
 
       {/* Add New Student Form & Roster Table */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left: Add Student Manually (4 cols) */}
         <div className="lg:col-span-4 bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-xl space-y-4">
           <h3 className="font-extrabold text-white text-sm flex items-center gap-2">
             <UserPlus className="w-4 h-4 text-amber-400" />
@@ -285,7 +275,6 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
           </form>
         </div>
 
-        {/* Right: Students Table (8 cols) */}
         <div className="lg:col-span-8 bg-slate-900 p-5 rounded-3xl border border-slate-800 shadow-xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
             <h3 className="font-extrabold text-white text-sm">
@@ -302,49 +291,47 @@ Bùi Việt Cường,3A-13,Nam,team-red`;
                 <tr>
                   <th className="py-2.5 px-3">Mã HS</th>
                   <th className="py-2.5 px-3">Họ và Tên</th>
-                  <th className="py-2.5 px-3">Đội Đua</th>
+                  <th className="py-2.5 px-3">Đội Nhóm</th>
                   <th className="py-2.5 px-3 text-right">Điểm Cộng Dồn</th>
                   <th className="py-2.5 px-3 text-right">Đúng / Sai</th>
                   <th className="py-2.5 px-3 text-center">Combo Cao Nhất</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {students.map((st) => {
-                  return (
-                    <tr key={st.id} className="hover:bg-slate-800/40 text-slate-200">
-                      <td className="py-2.5 px-3 font-mono font-bold text-amber-400">{st.rollNumber}</td>
-                      <td className="py-2.5 px-3 font-semibold text-white flex items-center gap-1.5">
-                        <span>{st.avatar}</span>
-                        <span>{st.name}</span>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <select
-                          value={st.teamId}
-                          onChange={(e) => updateTeamAssignment(st.id, e.target.value)}
-                          className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none"
-                        >
-                          {currentClass.teams.map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {t.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono font-black text-amber-300">
-                        {st.cumulativeScore} đ
-                      </td>
-                      <td className="py-2.5 px-3 text-right font-mono">
-                        <span className="text-emerald-400 font-bold">{st.totalCorrect}</span> /{' '}
-                        <span className="text-rose-400">{st.totalWrong}</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center">
-                        <span className="bg-orange-500/20 text-orange-400 font-bold px-2 py-0.5 rounded-md font-mono">
-                          🔥 {st.highestCombo}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {students.map((st) => (
+                  <tr key={st.id} className="hover:bg-slate-800/40 text-slate-200">
+                    <td className="py-2.5 px-3 font-mono font-bold text-amber-400">{st.rollNumber}</td>
+                    <td className="py-2.5 px-3 font-semibold text-white flex items-center gap-1.5">
+                      <span>{st.avatar}</span>
+                      <span>{st.name}</span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <select
+                        value={st.teamId}
+                        onChange={(e) => updateTeamAssignment(st.id, e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none"
+                      >
+                        {currentClass.teams.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono font-black text-amber-300">
+                      {st.cumulativeScore} đ
+                    </td>
+                    <td className="py-2.5 px-3 text-right font-mono">
+                      <span className="text-emerald-400 font-bold">{st.totalCorrect}</span> /{' '}
+                      <span className="text-rose-400">{st.totalWrong}</span>
+                    </td>
+                    <td className="py-2.5 px-3 text-center">
+                      <span className="bg-orange-500/20 text-orange-400 font-bold px-2 py-0.5 rounded-md font-mono">
+                        🔥 {st.highestCombo}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

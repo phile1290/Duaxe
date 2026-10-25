@@ -1,30 +1,33 @@
 import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { QuizSet, Question, SubjectType } from '../../types';
-import { extractQuizWithGemini } from '../../services/geminiClientService';
+import { extractQuizWithGemini, normalizeQuestionVisuals } from '../../services/geminiClientService';
+import { ALLOWED_SUBJECTS } from '../../services/classroomStorageService';
+import {
+  QuestionVisualIllustration,
+  OptionVisualIllustration,
+  getUniformOptionVisuals,
+  resolveVisualDisplayMode,
+} from '../ClassroomGame/QuestionVisualIllustration';
 import {
   Sparkles,
   Upload,
-  FileText,
   CheckCircle,
-  Plus,
-  Trash2,
   RefreshCw,
   BookOpen,
   HelpCircle,
-  Code2,
   Settings,
 } from 'lucide-react';
 
 export const AiQuizGenerator: React.FC = () => {
   const { selectedWeek, addGeneratedQuiz, setViewMode, openSettings } = useGameStore();
 
-  const [lessonTitle, setLessonTitle] = useState('Bài 14: Ôn tập phép nhân và bảng nhân');
-  const [subject, setSubject] = useState<SubjectType>('Toán');
-  const [grade, setGrade] = useState<number>(3);
+  const [lessonTitle, setLessonTitle] = useState('');
+  const [subject, setSubject] = useState<SubjectType>(ALLOWED_SUBJECTS[0]);
+  const [grade] = useState<number>(3);
   const [questionCount, setQuestionCount] = useState<number>(5);
   const [rawText, setRawText] = useState<string>(
-    'Ví dụ nội dung bài học: Học sinh ôn tập bảng nhân 2, 3, 4, 5. Nắm vững tính chất giao hoán của phép nhân: 2 x 5 = 5 x 2. Áp dụng giải toán có lời văn: mỗi hộp có 6 bút chì màu, hỏi 4 hộp có bao nhiêu cái bút chì màu.'
+    'Ví dụ nội dung bài học: Học sinh nhận biết các thiết bị phần cứng máy tính (màn hình, thân máy, bàn phím, chuột) và các phần mềm ứng dụng cơ bản.'
   );
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
@@ -42,7 +45,6 @@ export const AiQuizGenerator: React.FC = () => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      // Extract base64 without data URI prefix
       const base64Clean = result.split(',')[1] || result;
       setPdfBase64(base64Clean);
     };
@@ -64,121 +66,112 @@ export const AiQuizGenerator: React.FC = () => {
         pdfBase64,
       });
 
+      const resolvedUpperTitle = (result.resolvedLessonTitle || lessonTitle || 'BÀI HỌC').trim().toUpperCase();
+      setLessonTitle(resolvedUpperTitle);
+
       if (result.success && result.questions && result.questions.length > 0) {
-        setGeneratedQuestions(result.questions);
-        setStatusMessage('Đã tạo thành công bộ câu hỏi qua Google Gemini AI!');
+        setGeneratedQuestions(normalizeQuestionVisuals(result.questions));
+        setStatusMessage(`Đã tạo thành công bộ câu hỏi bao quát toàn bộ bài "${resolvedUpperTitle}"!`);
       } else {
-        // Fallback generator with smart templates if API key is not configured or in sandbox
-        const fallbackQs: Question[] = [
+        const baseTemplates: Question[] = [
           {
             id: `gen-${Date.now()}-1`,
-            question: `Theo bài "${lessonTitle}", phép tính nào sau đây cho kết quả chính xác?`,
-            options: ['6 × 4 = 24', '6 × 4 = 20', '6 × 4 = 28', '6 × 4 = 18'],
+            question: `Theo bài "${resolvedUpperTitle}", kết quả của phép tính 6 × 4 bằng bao nhiêu?`,
+            options: ['24', '20', '28', '18'],
+            optionVisuals: [],
             correctIndex: 0,
             explanation: 'Chính xác! 6 nhân 4 bằng 24 theo bảng nhân 6.',
-            visualType: 'math_shape' as const,
-            visualPrompt: '4 nhóm bút chì, mỗi nhóm 6 cây',
+            visualDisplayMode: 'question_image' as const,
+            visualType: 'number_line' as const,
+            visualData: '6 × 4 = ?',
             points: 10,
           },
           {
             id: `gen-${Date.now()}-2`,
-            question: 'Mẹ mua 5 vỉ trứng, mỗi vỉ có 6 quả trứng. Hỏi mẹ mua tất cả bao nhiêu quả trứng?',
-            options: ['25 quả', '30 quả', '35 quả', '20 quả'],
-            correctIndex: 1,
-            explanation: 'Đúng rồi! Ta lấy 6 × 5 = 30 quả trứng.',
-            visualType: 'emoji_icon' as const,
-            visualPrompt: '5 vỉ trứng gà tươi ngon',
+            question: 'Trong các đáp án dưới đây, đâu là biểu tượng của phần mềm soạn thảo văn bản Word?',
+            options: ['Phần mềm Word', 'Phần mềm PowerPoint', 'Phần mềm Excel', 'Phần mềm Paint'],
+            optionVisuals: ['word_icon', 'powerpoint_icon', 'excel_icon', 'paint_icon'],
+            correctIndex: 0,
+            explanation: 'Đúng rồi! Biểu tượng chữ W màu xanh dương là của phần mềm Microsoft Word.',
+            visualDisplayMode: 'options_image' as const,
+            visualType: 'software_icon' as const,
+            visualData: '',
             points: 10,
           },
           {
             id: `gen-${Date.now()}-3`,
-            question: 'Khi đổi chỗ các thừa số trong một tích thì tích đó sẽ ra sao?',
-            options: ['Không thay đổi', 'Tăng gấp đôi', 'Bị giảm đi một nửa', 'Bằng 0'],
+            question: 'Trong các đáp án dưới đây, hình nào là hình vuông có 4 cạnh bằng nhau?',
+            options: ['Hình vuông', 'Hình tam giác', 'Hình tròn', 'Hình chữ nhật'],
+            optionVisuals: ['shape_square', 'shape_triangle', 'shape_circle', 'shape_rectangle'],
             correctIndex: 0,
-            explanation: 'Chính xác! Đó là tính chất giao hoán của phép nhân: a × b = b × a.',
-            visualType: 'badge' as const,
-            visualPrompt: 'Huy hiệu quy tắc toán học',
+            explanation: 'Chính xác! Hình vuông có 4 góc vuông và 4 cạnh bằng nhau.',
+            visualDisplayMode: 'options_image' as const,
+            visualType: 'math_shape' as const,
+            visualData: '',
             points: 10,
           },
           {
             id: `gen-${Date.now()}-4`,
-            question: 'Điền số thích hợp vào chỗ trống: 5 × ... = 45',
-            options: ['8', '9', '7', '6'],
-            correctIndex: 1,
-            explanation: 'Xuất sắc! 5 × 9 = 45!',
-            visualType: 'diagram' as const,
-            visualPrompt: 'Biểu đồ phép nhân trực quan',
+            question: 'Biểu tượng trong hình ảnh bên là thiết bị phần cứng nào của máy tính?',
+            options: ['Màn hình máy tính', 'Thân máy tính', 'Chuột máy tính', 'Bàn phím máy tính'],
+            optionVisuals: [],
+            correctIndex: 0,
+            explanation: 'Xuất sắc! Hình ảnh bên là màn hình máy tính dùng để hiển thị thông tin.',
+            visualDisplayMode: 'question_image' as const,
+            visualType: 'computer_hardware' as const,
+            visualKey: 'monitor',
+            visualData: 'Màn hình máy tính',
             points: 10,
           },
           {
             id: `gen-${Date.now()}-5`,
-            question: 'Một con nhện có 8 chân. Hỏi 3 con nhện có tất cả bao nhiêu cái chân?',
-            options: ['21 chân', '24 chân', '28 chân', '18 chân'],
+            question: 'Mẹ mua 5 vỉ trứng, mỗi vỉ có 6 quả trứng. Hỏi mẹ mua tất cả bao nhiêu quả trứng?',
+            options: ['25 quả trứng', '30 quả trứng', '35 quả trứng', '20 quả trứng'],
+            optionVisuals: [],
             correctIndex: 1,
-            explanation: 'Hoan hô! 8 × 3 = 24 cái chân.',
-            visualType: 'animal' as const,
-            visualPrompt: '3 chú nhện hoạt hình ngộ nghĩnh',
+            explanation: 'Hoan hô! 6 × 5 = 30 quả trứng.',
+            visualDisplayMode: 'question_image' as const,
+            visualType: 'emoji_icon' as const,
+            visualData: '6 🥚 × 5 = ?',
             points: 10,
           },
-        ].slice(0, questionCount);
+        ];
+        const fallbackQs = Array.from({ length: questionCount }, (_, idx) => {
+          const tpl = baseTemplates[idx % baseTemplates.length];
+          return {
+            ...tpl,
+            id: `gen-${Date.now()}-${idx + 1}`,
+            question: idx < baseTemplates.length ? tpl.question : `Câu ${idx + 1}: ${tpl.question}`,
+          };
+        });
 
         setGeneratedQuestions(fallbackQs);
         setStatusMessage(
-          result.message || 'Đã tạo thành công bộ câu hỏi chuẩn hóa sư phạm cho bài học này!'
+          result.message || `Đã tạo thành công bộ câu hỏi bao quát bài "${resolvedUpperTitle}"!`
         );
       }
     } catch (err: any) {
       console.error(err);
-      const fallbackQs: Question[] = [
-        {
-          id: `gen-${Date.now()}-1`,
-          question: `Theo bài "${lessonTitle}", phép tính nào sau đây cho kết quả chính xác?`,
-          options: ['6 × 4 = 24', '6 × 4 = 20', '6 × 4 = 28', '6 × 4 = 18'],
-          correctIndex: 0,
-          explanation: 'Chính xác! 6 nhân 4 bằng 24 theo bảng nhân 6.',
-          visualType: 'math_shape' as const,
-          visualPrompt: '4 nhóm bút chì, mỗi nhóm 6 cây',
-          points: 10,
-        },
-        {
-          id: `gen-${Date.now()}-2`,
-          question: 'Mẹ mua 5 vỉ trứng, mỗi vỉ có 6 quả trứng. Hỏi mẹ mua tất cả bao nhiêu quả trứng?',
-          options: ['25 quả', '30 quả', '35 quả', '20 quả'],
-          correctIndex: 1,
-          explanation: 'Đúng rồi! Ta lấy 6 × 5 = 30 quả trứng.',
-          visualType: 'emoji_icon' as const,
-          visualPrompt: '5 vỉ trứng gà tươi ngon',
-          points: 10,
-        },
-        {
-          id: `gen-${Date.now()}-3`,
-          question: 'Khi đổi chỗ các thừa số trong một tích thì tích đó sẽ ra sao?',
-          options: ['Không thay đổi', 'Tăng gấp đôi', 'Bị giảm đi một nửa', 'Bằng 0'],
-          correctIndex: 0,
-          explanation: 'Chính xác! Đó là tính chất giao hoán của phép nhân: a × b = b × a.',
-          visualType: 'badge' as const,
-          visualPrompt: 'Huy hiệu quy tắc toán học',
-          points: 10,
-        },
-      ].slice(0, questionCount);
-      setGeneratedQuestions(fallbackQs);
+      const upperTitle = (lessonTitle || 'BÀI HỌC').trim().toUpperCase();
+      setLessonTitle(upperTitle);
       setStatusMessage('Đã tự động khởi tạo bộ câu hỏi sư phạm chuẩn hoá cho bài học.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Apply Questions to Race Session
+  // Apply Questions to Game Session
   const handleApplyToRace = () => {
     if (generatedQuestions.length === 0) return;
+    const upperTitle = (lessonTitle || 'BÀI HỌC').trim().toUpperCase();
 
     const newQuizSet: QuizSet = {
       id: `quiz-gen-week-${selectedWeek}-${Date.now()}`,
       weekNumber: selectedWeek,
-      lessonTitle,
+      lessonTitle: upperTitle,
       subject,
       grade,
-      description: `Bộ câu hỏi AI trích xuất cho ${lessonTitle}`,
+      description: `BÀI HỌC: ${upperTitle}`,
       questions: generatedQuestions,
       createdAt: new Date().toISOString(),
     };
@@ -189,7 +182,6 @@ export const AiQuizGenerator: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-indigo-900/60 via-purple-900/40 to-slate-900 p-6 rounded-3xl border border-indigo-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -198,10 +190,10 @@ export const AiQuizGenerator: React.FC = () => {
             <span>Gemini RAG Module • Trích xuất sách giáo khoa</span>
           </div>
           <h2 className="text-2xl font-black text-white">
-            Tạo Câu Hỏi Đua Xe Tự Động Từ Sách Giáo Khoa (PDF)
+            Tạo Câu Hỏi Trắc Nghiệm Tự Động Từ Sách Giáo Khoa (PDF)
           </h2>
           <p className="text-sm text-slate-300 mt-1">
-            Tải lên tài liệu PDF hoặc nhập bài học số X. AI Gemini sẽ tự động phân tích vùng kiến thức và sinh bộ câu hỏi trắc nghiệm kèm gợi ý hình ảnh trực quan.
+            Tải lên tài liệu PDF hoặc nhập bài học. AI Gemini sẽ tự động phân tích vùng kiến thức và sinh bộ câu hỏi kèm hình ảnh to rõ ràng cho câu hỏi và cả 4 đáp án đồng nhất.
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-2.5">
@@ -215,13 +207,12 @@ export const AiQuizGenerator: React.FC = () => {
           </button>
           <div className="bg-indigo-950/80 px-4 py-2 rounded-2xl border border-indigo-500/40 text-center w-full sm:w-auto">
             <div className="text-[10px] text-indigo-300 font-bold">Đang gán cho:</div>
-            <div className="text-base font-black text-amber-400">Tuần {selectedWeek} / 35</div>
+            <div className="text-base font-black text-amber-400">Tuần {selectedWeek}</div>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
         {/* Left Column: Input Form (5 cols) */}
         <div className="lg:col-span-5 bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4 shadow-xl">
           <h3 className="font-extrabold text-white text-base flex items-center gap-2">
@@ -229,59 +220,42 @@ export const AiQuizGenerator: React.FC = () => {
             <span>Thông Tin Bài Học & Nguồn Dữ Liệu</span>
           </h3>
 
-          {/* Lesson Title */}
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-              Tên bài học hoặc chủ đề:
+              Tên bài học hoặc số bài:
             </label>
             <input
               type="text"
               value={lessonTitle}
               onChange={(e) => setLessonTitle(e.target.value)}
-              placeholder="VD: Bài 14: Ôn tập bảng nhân và chia"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500"
+              placeholder='Chỉ cần nhập "Bài 1", "Bài 2" hoặc tên bài...'
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder:text-slate-500"
             />
           </div>
 
-          {/* Subject & Grade */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Môn học:</label>
-              <select
-                value={subject}
-                onChange={(e) => setSubject(e.target.value as SubjectType)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value="Toán">Toán</option>
-                <option value="Tiếng Việt">Tiếng Việt</option>
-                <option value="Khoa học">Khoa học</option>
-                <option value="Lịch sử & Địa lí">Lịch sử & Địa lí</option>
-                <option value="Tiếng Anh">Tiếng Anh</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">Khối lớp:</label>
-              <select
-                value={grade}
-                onChange={(e) => setGrade(parseInt(e.target.value, 10))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500"
-              >
-                <option value={1}>Lớp 1</option>
-                <option value={2}>Lớp 2</option>
-                <option value={3}>Lớp 3</option>
-                <option value={4}>Lớp 4</option>
-                <option value={5}>Lớp 5</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+              Môn học (4 lựa chọn chuyên biệt):
+            </label>
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-indigo-500"
+            >
+              {ALLOWED_SUBJECTS.map((subjItem) => (
+                <option key={subjItem} value={subjItem}>
+                  {subjItem}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Question Count */}
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
               Số lượng câu hỏi cần sinh:
             </label>
-            <div className="flex gap-2">
-              {[3, 5, 8, 10].map((num) => (
+            <div className="flex gap-1.5">
+              {[3, 5, 8, 10, 15, 20].map((num) => (
                 <button
                   key={num}
                   type="button"
@@ -298,7 +272,6 @@ export const AiQuizGenerator: React.FC = () => {
             </div>
           </div>
 
-          {/* Upload PDF Section */}
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
               Tải lên Sách Giáo Khoa (PDF):
@@ -325,7 +298,6 @@ export const AiQuizGenerator: React.FC = () => {
             </div>
           </div>
 
-          {/* Or Manual Textbook Excerpt */}
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
               Hoặc dán đoạn trích kiến thức bài học:
@@ -339,7 +311,6 @@ export const AiQuizGenerator: React.FC = () => {
             />
           </div>
 
-          {/* Generate Button */}
           <button
             onClick={handleGenerate}
             disabled={isLoading}
@@ -373,8 +344,13 @@ export const AiQuizGenerator: React.FC = () => {
               <h3 className="font-extrabold text-white text-base">
                 Xem Trước Bộ Câu Hỏi Trắc Nghiệm ({generatedQuestions.length} câu)
               </h3>
+              {lessonTitle && (
+                <div className="text-xs font-black text-amber-300 uppercase mt-0.5">
+                  TÊN BÀI HỌC: {lessonTitle.toUpperCase()}
+                </div>
+              )}
               <p className="text-xs text-slate-300">
-                Mỗi câu hỏi có 4 lựa chọn, đáp án chuẩn xác, và gợi ý hình ảnh minh họa cho học sinh
+                Nguyên tắc bắt buộc: Khi câu hỏi có hình ảnh thì đáp án là văn bản • Khi đáp án là hình ảnh thì câu hỏi là văn bản
               </p>
             </div>
 
@@ -383,7 +359,7 @@ export const AiQuizGenerator: React.FC = () => {
                 onClick={handleApplyToRace}
                 className="py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-400/20 cursor-pointer"
               >
-                <span>NẠP VÀO ĐƯỜNG ĐUA</span>
+                <span>NẠP VÀO TRÒ CHƠI</span>
               </button>
             )}
           </div>
@@ -398,49 +374,64 @@ export const AiQuizGenerator: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-3.5 overflow-y-auto max-h-[520px] pr-1">
-              {generatedQuestions.map((q, qIdx) => (
-                <div
-                  key={q.id || qIdx}
-                  className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/80 text-left space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-black bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md">
-                      Câu {qIdx + 1}
-                    </span>
-                    <span className="text-xs text-slate-300 font-mono">
-                      Loại ảnh: {q.visualType || 'Minh họa'}
-                    </span>
-                  </div>
+              {generatedQuestions.map((q, qIdx) => {
+                const qMode = resolveVisualDisplayMode(q);
+                const showQImg = qMode === 'question_image';
+                const uniformOpts = qMode === 'options_image' ? getUniformOptionVisuals(q) : null;
+                return (
+                  <div
+                    key={q.id || qIdx}
+                    className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/80 text-left space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-black bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md">
+                        Câu {qIdx + 1}
+                      </span>
+                    </div>
 
-                  <h4 className="text-sm sm:text-base font-bold text-white leading-snug">
-                    {q.question}
-                  </h4>
+                    <h4 className="text-sm sm:text-base font-bold text-white leading-snug">
+                      {q.question}
+                    </h4>
 
-                  {/* Options */}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    {q.options.map((opt, oIdx) => (
-                      <div
-                        key={oIdx}
-                        className={`p-2 rounded-xl text-xs flex items-center gap-2 border ${
-                          oIdx === q.correctIndex
-                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
-                            : 'bg-slate-900/60 border-slate-700 text-slate-300'
-                        }`}
-                      >
-                        <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center font-bold text-[10px]">
-                          {String.fromCharCode(65 + oIdx)}
-                        </span>
-                        <span className="truncate">{opt}</span>
-                      </div>
-                    ))}
-                  </div>
+                    {showQImg && <QuestionVisualIllustration question={q} index={qIdx + 1} compact />}
 
-                  {/* Explanation */}
-                  <div className="text-xs text-amber-300/90 bg-amber-950/30 p-2 rounded-xl border border-amber-900/30">
-                    💡 <strong>Giải thích:</strong> {q.explanation}
+                    {/* Options: pure text if question has image; uniform 4 images if options_image */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {q.options.map((opt, oIdx) => (
+                        <div
+                          key={oIdx}
+                          className={`p-2 rounded-xl text-xs flex flex-col gap-1.5 border ${
+                            oIdx === q.correctIndex
+                              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold'
+                              : 'bg-slate-900/60 border-slate-700 text-slate-300'
+                          }`}
+                        >
+                          {uniformOpts && (
+                            <OptionVisualIllustration
+                              optionText={opt}
+                              visualSpec={uniformOpts[oIdx]}
+                              optionSvg={q.optionSvgs?.[oIdx]}
+                              optionIndex={oIdx}
+                              visualType={q.visualType}
+                              questionText={q.question}
+                            />
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center font-bold text-[10px]">
+                              {String.fromCharCode(65 + oIdx)}
+                            </span>
+                            <span className="truncate">{opt}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="text-xs text-amber-300/90 bg-amber-950/30 p-2 rounded-xl border border-amber-900/30">
+                      💡 <strong>Giải thích:</strong> {q.explanation}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

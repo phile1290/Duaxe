@@ -1,44 +1,70 @@
 import React, { useEffect, useState } from 'react';
 import { Question, Racer } from '../../types';
-import { Timer, Flame, Sparkles } from 'lucide-react';
+import {
+  QuestionVisualIllustration,
+  OptionVisualIllustration,
+  getUniformOptionVisuals,
+  resolveVisualDisplayMode,
+} from './QuestionVisualIllustration';
+import { Timer, Flame, UserCheck, Clock, CheckCircle2, Shuffle } from 'lucide-react';
 
 interface QuestionHUDProps {
   question: Question;
   activeRacer: Racer;
-  onAnswer: (optionIndex: number) => void;
+  selectedStudentName?: string | null;
+  studentCallCount?: number;
+  lessonTitle?: string;
+  questionNumber?: number;
+  totalQuestions?: number;
+  onAnswer: (optionIndex: number, elapsedSeconds: number) => void;
   combo: number;
 }
 
 export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   question,
   activeRacer,
+  selectedStudentName,
+  studentCallCount = 1,
+  lessonTitle,
+  questionNumber = 1,
+  totalQuestions = 5,
   onAnswer,
   combo,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(25);
-  const totalTime = 25;
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const totalTime = 30;
   const answeredRef = React.useRef(false);
+  const startTimeRef = React.useRef<number>(Date.now());
   const onAnswerRef = React.useRef(onAnswer);
   onAnswerRef.current = onAnswer;
 
-  // Reset answered status and timer whenever question changes
   useEffect(() => {
     answeredRef.current = false;
     setTimeLeft(totalTime);
+    setElapsedSec(0);
+    startTimeRef.current = Date.now();
 
-    const interval = setInterval(() => {
+    const countdownInterval = setInterval(() => {
       setTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
 
-    return () => clearInterval(interval);
-  }, [question.id]);
+    const stopwatchInterval = setInterval(() => {
+      const diffSec = (Date.now() - startTimeRef.current) / 1000;
+      setElapsedSec(Math.min(totalTime, Math.round(diffSec * 10) / 10));
+    }, 100);
 
-  // Handle timeout safely outside render phase
+    return () => {
+      clearInterval(countdownInterval);
+      clearInterval(stopwatchInterval);
+    };
+  }, [question.id, questionNumber]);
+
   useEffect(() => {
     if (timeLeft === 0 && !answeredRef.current) {
       answeredRef.current = true;
       const timeoutTimer = setTimeout(() => {
-        onAnswerRef.current(-1); // Timeout
+        onAnswerRef.current(-1, totalTime);
       }, 0);
       return () => clearTimeout(timeoutTimer);
     }
@@ -47,7 +73,9 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   const handleSelectAnswer = (optionIndex: number) => {
     if (answeredRef.current) return;
     answeredRef.current = true;
-    onAnswer(optionIndex);
+    const rawElapsed = (Date.now() - startTimeRef.current) / 1000;
+    const finalSeconds = Math.max(0.1, Math.min(totalTime, Math.round(rawElapsed * 10) / 10));
+    onAnswer(optionIndex, finalSeconds);
   };
 
   useEffect(() => {
@@ -62,47 +90,88 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   }, []);
 
   const optionColors = [
-    { bg: 'bg-rose-500 hover:bg-rose-600 active:bg-rose-700', border: 'border-rose-400', badge: 'bg-rose-700', label: 'A' },
-    { bg: 'bg-blue-500 hover:bg-blue-600 active:bg-blue-700', border: 'border-blue-400', badge: 'bg-blue-700', label: 'B' },
-    { bg: 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700', border: 'border-amber-400', badge: 'bg-amber-700', label: 'C' },
-    { bg: 'bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700', border: 'border-emerald-400', badge: 'bg-emerald-700', label: 'D' },
+    { bg: 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700', border: 'border-rose-400', badge: 'bg-rose-900', label: 'A' },
+    { bg: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700', border: 'border-blue-400', badge: 'bg-blue-900', label: 'B' },
+    { bg: 'bg-amber-600 hover:bg-amber-500 active:bg-amber-700', border: 'border-amber-400', badge: 'bg-amber-900', label: 'C' },
+    { bg: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700', border: 'border-emerald-400', badge: 'bg-emerald-900', label: 'D' },
   ];
 
   const timePercent = (timeLeft / totalTime) * 100;
+  const currentHook = activeRacer?.hookLevel ?? Math.round((activeRacer?.progress || 0) / 10);
+  const currentCorrect = activeRacer?.correctCount ?? 0;
+  const currentTotalSec = activeRacer?.totalTimeSec ?? 0;
+  const visualMode = resolveVisualDisplayMode(question);
+  const showQuestionImage = visualMode === 'question_image';
+  const uniformOptionVisuals = visualMode === 'options_image' ? getUniformOptionVisuals(question) : null;
 
   return (
-    <div className="w-full bg-slate-900/95 border-b-2 border-amber-400/80 shadow-2xl backdrop-blur-md px-2.5 py-2 sm:px-5 sm:py-3 select-none flex flex-col justify-between">
-      
-      {/* 1. Header Bar: Active Racer Turn + Combo + Countdown Timer */}
-      <div className="flex items-center justify-between gap-1.5 pb-1 border-b border-slate-800">
-        
-        {/* Racer Turn Badge */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+    <div className="w-full bg-slate-900/95 border-b-2 border-amber-400/80 shadow-2xl backdrop-blur-md px-2.5 py-2 sm:px-4 sm:py-2.5 select-none flex flex-col justify-between">
+      {/* 1. Header Bar: Active Climber Turn + Selected Student + Correct Count & Seconds + Timer */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-slate-800">
+        {/* Left: Active Team/Student & Caught Chick Student */}
+        <div className="flex items-center gap-2 min-w-0">
           <div
-            className="w-7 h-7 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shrink-0 shadow font-black text-slate-950 ring-1 ring-white/20"
-            style={{ backgroundColor: activeRacer.colorHex }}
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shrink-0 shadow font-black text-slate-950 ring-1 ring-white/20"
+            style={{ backgroundColor: activeRacer?.colorHex || '#f59e0b' }}
           >
-            {activeRacer.avatar}
+            {activeRacer?.avatar || '🦁'}
           </div>
           <div className="min-w-0">
-            <div className="text-[9px] sm:text-[10px] text-amber-300 font-bold uppercase tracking-wider leading-none">
-              Lượt thi đấu của:
-            </div>
-            <div className="text-xs sm:text-sm md:text-base font-extrabold text-white truncate">
-              {activeRacer.name}{' '}
-              <span className="text-[11px] sm:text-xs text-amber-300 font-mono font-bold">
-                (Xe #{activeRacer.carNumber} • {activeRacer.score}đ)
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider leading-none">
+                Lượt trả lời ngẫu nhiên:
               </span>
+              {lessonTitle && (
+                <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/40 px-1.5 py-0.2 rounded uppercase truncate max-w-[180px] sm:max-w-xs">
+                  {lessonTitle.toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="text-xs sm:text-sm font-extrabold text-white truncate flex items-center gap-1.5 flex-wrap">
+              <span>{activeRacer?.name}</span>
+              <span className="text-[10px] sm:text-xs text-amber-300 font-mono font-bold">
+                (Móc {currentHook}/10 • {activeRacer?.score || 0}đ • ✅ {currentCorrect} đúng • ⏱️{' '}
+                {currentTotalSec.toFixed(1)}s)
+              </span>
+              {selectedStudentName && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black">
+                  <UserCheck className="w-3 h-3" />
+                  <span>🐥 {selectedStudentName}</span>
+                </span>
+              )}
+              {studentCallCount > 1 && (
+                <span
+                  title="Bà già chống gậy bắt ngẫu nhiên nên một học sinh có thể được gọi nhiều lần trong cuộc chơi"
+                  className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-indigo-600/90 border border-indigo-300 text-white text-[10px] font-black"
+                >
+                  <Shuffle className="w-2.5 h-2.5" />
+                  <span>Ngẫu nhiên lần {studentCallCount}</span>
+                </span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Combo & Timer */}
+        {/* Right: Question Counter, Live Stopwatch (Số Giây), Combo & Countdown Timer */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <span className="bg-indigo-950 border border-indigo-500/50 text-indigo-200 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black">
+            Câu {questionNumber}/{totalQuestions}
+          </span>
+
+          {/* Đồng hồ bấm giây tính tốc độ trả lời để phân định thắng thua khi ngang điểm */}
+          <div
+            title="Số giây trả lời câu hỏi này (dùng để phân định người thắng cuộc khi ngang điểm)"
+            className="bg-emerald-950/90 px-2 py-0.5 rounded-lg border border-emerald-500/60 flex items-center gap-1 text-[11px]"
+          >
+            <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span className="font-mono font-black text-emerald-300">
+              {elapsedSec.toFixed(1)} giây
+            </span>
+          </div>
+
           <div className="bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-700 flex items-center gap-1 text-[11px]">
             <Flame className={`w-3.5 h-3.5 ${combo >= 2 ? 'text-orange-400 animate-bounce' : 'text-slate-400'}`} />
             <span className="font-mono font-black text-amber-300">{combo}/3</span>
-            {combo >= 3 && <span className="text-[9px] text-cyan-400 font-black animate-pulse">NITRO!</span>}
           </div>
 
           <div className="bg-slate-800/90 px-2 sm:px-2.5 py-0.5 rounded-lg border border-slate-700 flex items-center gap-1">
@@ -124,19 +193,33 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         />
       </div>
 
-      {/* 2. Question Text Card */}
-      <div className="my-1 px-0.5">
-        <div className="flex items-start gap-1.5">
-          <span className="text-[10px] sm:text-xs bg-indigo-500/20 text-indigo-300 font-bold px-1.5 py-0.5 rounded shrink-0">
-            Câu hỏi:
+      {/* 2. Question Area:
+          - Khi câu hỏi có hình ảnh (showQuestionImage): Hiển thị văn bản câu hỏi + hình ảnh câu hỏi bên cạnh (và đáp án sẽ là văn bản thuần).
+          - Khi đáp án là các hình ảnh (options_image) hoặc câu hỏi thuần chữ: Câu hỏi CHỈ hiển thị văn bản toàn chiều ngang. */}
+      <div className="my-1 grid grid-cols-1 lg:grid-cols-12 gap-2 items-center">
+        <div
+          className={`${
+            showQuestionImage ? 'lg:col-span-8' : 'lg:col-span-12'
+          } flex items-start gap-2 bg-slate-950/70 border border-slate-800 rounded-xl p-2 sm:p-2.5`}
+        >
+          <span className="text-[10px] sm:text-xs bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shrink-0">
+            CÂU {questionNumber}
           </span>
-          <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-white leading-snug line-clamp-2">
+          <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-white leading-snug">
             {question.question}
           </h2>
         </div>
+
+        {showQuestionImage && (
+          <div className="lg:col-span-4">
+            <QuestionVisualIllustration question={question} index={questionNumber} compact />
+          </div>
+        )}
       </div>
 
-      {/* 3. 4 Answer Options (2 cols on mobile portrait, 4 cols on mobile landscape & desktop) */}
+      {/* 3. 4 Answer Options (A, B, C, D):
+          - Khi câu hỏi hiển thị hình ảnh -> Đáp án chỉ là VĂN BẢN.
+          - Khi đáp án là các hình ảnh -> Cả 4 đáp án đều có hình ảnh đồng nhất và câu hỏi là VĂN BẢN. */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 pt-0.5">
         {question.options.map((opt, idx) => {
           const col = optionColors[idx];
@@ -144,14 +227,29 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             <button
               key={idx}
               onClick={() => handleSelectAnswer(idx)}
-              className={`group flex items-center gap-1.5 p-1.5 sm:p-2.5 rounded-xl ${col.bg} border ${col.border} text-white font-bold text-left transition-all active:scale-95 shadow-md cursor-pointer`}
+              className={`group flex flex-col justify-between gap-1.5 p-2 sm:p-2.5 rounded-xl ${col.bg} border-2 ${col.border} text-white font-bold text-left transition-all active:scale-95 shadow-md cursor-pointer`}
             >
-              <span className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg ${col.badge} flex items-center justify-center text-[11px] sm:text-xs font-black shrink-0 shadow`}>
-                {col.label}
-              </span>
-              <span className="text-[11px] sm:text-xs md:text-sm flex-1 font-semibold leading-tight line-clamp-2">
-                {opt}
-              </span>
+              {uniformOptionVisuals && (
+                <OptionVisualIllustration
+                  optionText={opt}
+                  visualSpec={uniformOptionVisuals[idx]}
+                  optionSvg={question.optionSvgs?.[idx]}
+                  optionIndex={idx}
+                  visualType={question.visualType}
+                  questionText={question.question}
+                />
+              )}
+
+              <div className="flex items-center gap-2 w-full">
+                <span
+                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg ${col.badge} flex items-center justify-center text-[11px] sm:text-xs font-black shrink-0 shadow`}
+                >
+                  {col.label}
+                </span>
+                <span className="text-xs sm:text-sm md:text-base flex-1 font-extrabold leading-tight line-clamp-2">
+                  {opt}
+                </span>
+              </div>
             </button>
           );
         })}
