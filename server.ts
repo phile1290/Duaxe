@@ -10,59 +10,53 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const GEMINI_MODEL_CHAIN = [
+  'gemini-3.8-flash',
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+  'gemini-2.0-flash',
+];
+
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const PORT = 3000;
 
+  // Allow large JSON payload for PDF base64 uploads
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-  // Comprehensive CORS and frame headers for AI Studio and external previews
-  app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', '*');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-    res.removeHeader('X-Frame-Options');
-    next();
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Initialize Gemini AI Client with telemetry header
-  const geminiApiKey = process.env.GEMINI_API_KEY || '';
-
-  // API Health Check
-  app.get('/api/health', (req, res) => {
-    res.json({
-      status: 'ok',
-      hasGeminiKey: Boolean(geminiApiKey),
-      time: new Date().toISOString(),
-    });
-  });
-
-  // API: Gemini PDF/Lesson RAG Extraction
+  // Server-side Gemini API proxy route for textbook PDF / lesson quiz generation
   app.post('/api/gemini/extract-quiz', async (req, res) => {
     try {
       const {
-        lessonTitle,
-        subject,
+        lessonTitle = 'Bài 1',
+        subject = 'Công nghệ',
+        grade,
+        className = '',
         questionCount = 5,
         content = '',
         pdfBase64 = null,
         apiKey: bodyApiKey,
       } = req.body;
 
-      const customApiKey = (req.headers['x-gemini-api-key'] as string) || bodyApiKey || geminiApiKey;
+      // Priority: Custom user API Key (saved once in browser settings) -> Environment variable GEMINI_API_KEY
+      const headerApiKey = req.headers['x-gemini-api-key'] as string | undefined;
+      const activeApiKey = (headerApiKey || bodyApiKey || process.env.GEMINI_API_KEY || '').trim();
 
-      if (!customApiKey) {
+      if (!activeApiKey) {
         return res.status(200).json({
           success: false,
           fallback: true,
-          message: 'Chưa cấu hình GEMINI_API_KEY trên server hoặc trình duyệt. Đang dùng bộ đề chuẩn sư phạm.',
+          message: 'GEMINI_API_KEY chưa được cấu hình. Hãy bấm biểu tượng Cài Đặt (Bánh răng) để nhập khóa Gemini API một lần duy nhất.',
         });
       }
 
-      const activeAi = new GoogleGenAI({
-        apiKey: customApiKey,
+      const ai = new GoogleGenAI({
+        apiKey: activeApiKey,
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
@@ -70,35 +64,47 @@ async function startServer() {
         },
       });
 
-      const systemInstruction = `Bạn là một Chuyên gia Giáo dục và Kiến trúc sư AI hàng đầu tại Việt Nam.
-Nhiệm vụ của bạn là đọc toàn bộ nội dung bài học từ Sách Giáo Khoa (qua văn bản hoặc file PDF trích xuất) cho bài học: "${lessonTitle}" ${subject ? `, môn ${subject}` : ''}.
-YÊU CẦU QUAN TRỌNG BẮT BUỘC:
-1. TÊN BÀI HỌC CHÍNH XÁC IN HOA (lessonTitle):
-   - Nếu có file PDF đính kèm và người dùng chỉ nhập "bài 1", "bài 2"... hãy tra cứu đúng tên đầy đủ của bài đó trong PDF và viết IN HOA TOÀN BỘ (ví dụ: "BÀI 1: PHẦN CỨNG VÀ PHẦN MỀM MÁY TÍNH").
-   - Luôn trả về "lessonTitle" ở dạng CHỮ IN HOA TOÀN BỘ.
-2. BAO QUÁT TOÀN BỘ NỘI DUNG BÀI HỌC:
-   - Bộ ${questionCount} câu hỏi phải bao quát trọn vẹn 100% nội dung bài học từ đầu đến cuối (Khởi động/Khám phá, Kiến thức mới/Quy tắc, Thực hành - Luyện tập, Vận dụng).
-3. NGUYÊN TẮC VỀ HÌNH ẢNH TRỰC QUAN VÀ ĐỘ CHÍNH XÁC TUYỆT ĐỐI (visualDisplayMode):
-   - ƯU TIÊN CAO CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRỰC QUAN (chiếm khoảng 75% - 85% số câu hỏi) để học sinh hào hứng, sinh động, không nhàm chán.
-   - KHÔNG BẮT BUỘC CÂU NÀO CŨNG PHẢI GƯỢNG ÉP CÓ HÌNH: Câu hỏi nào cần hình ảnh thì BẮT BUỘC hình ảnh phải chính xác tuyệt đối với nội dung; câu hỏi nào mang tính lý thuyết/khái niệm trừu tượng không cần hình ảnh thì chọn "text_only" (không gượng ép hình ảnh sai lệch).
-   - Mỗi câu hỏi chọn 1 trong 3 chế độ "visualDisplayMode":
-     + Chế độ 1 ("visualDisplayMode": "question_image"): KHI CÂU HỎI HIỂN THỊ HÌNH ẢNH THÌ CẢ 4 ĐÁP ÁN A, B, C, D PHẢI LÀ VĂN BẢN THUẦN TÚY (để trống optionVisuals = []).
-       Ví dụ: Câu hỏi "Biểu tượng trong hình ảnh là của phần mềm gì?" -> visualDisplayMode = "question_image", visualKey = "word_icon", visualData = "Biểu tượng chữ W màu xanh", options = ["Word", "PowerPoint", "Excel", "Paint"], optionVisuals = [].
-     + Chế độ 2 ("visualDisplayMode": "options_image"): KHI ĐÁP ÁN LÀ CÁC HÌNH ẢNH THÌ CÂU HỎI PHẢI LÀ VĂN BẢN THUẦN TÚY (để trống visualData = "", visualKey = "") VÀ CẢ 4 ĐÁP ÁN A, B, C, D ĐỀU PHẢI CÓ HÌNH ẢNH CHÍNH XÁC ĐỒNG NHẤT.
-       Ví dụ: Câu hỏi "Trong các đáp án dưới đây, đâu là phần cứng máy tính?" hoặc "Thiết bị nào dưới đây là chuột máy tính?" -> visualDisplayMode = "options_image", visualData = "", options = ["Thân máy tính", "Màn hình máy tính", "Chuột máy tính", "Phần mềm PowerPoint"], optionVisuals = ["cpu_tower", "monitor", "mouse", "powerpoint_icon"].
-     + Chế độ 3 ("visualDisplayMode": "text_only"): Dành cho câu hỏi lý thuyết/khái niệm không cần hình ảnh minh họa (visualKey = "", visualData = "", optionVisuals = []).
-4. ĐỘ CHÍNH XÁC TUYỆT ĐỐI CỦA HÌNH ẢNH VỚI NỘI DUNG:
-   - Sử dụng chính xác các mã hình vẽ chuẩn trong "visualKey" (khi visualDisplayMode = "question_image") hoặc "optionVisuals" (khi visualDisplayMode = "options_image"):
-     * Tin học phần cứng: "cpu_tower" (Thân máy tính/CPU), "monitor" (Màn hình máy tính), "mouse" (Chuột máy tính), "keyboard" (Bàn phím máy tính), "speaker" (Loa máy tính), "printer" (Máy in), "headphones" (Tai nghe), "usb_drive" (USB), "hard_drive" (Ổ cứng), "power_cable" (Dây cáp nguồn), "mousepad" (Bàn di chuột), "laptop" (Máy tính xách tay), "hardware_overview" (Các bộ phận phần cứng máy tính).
-     * Tin học phần mềm: "word_icon" (Biểu tượng chữ W màu xanh - Microsoft Word), "powerpoint_icon" (Biểu tượng chữ P màu cam đỏ - PowerPoint), "excel_icon" (Biểu tượng chữ X màu xanh lá - Excel), "paint_icon" (Bảng màu vẽ tranh - Paint), "scratch_icon" (Scratch), "browser_icon" (Trình duyệt Web/Internet), "windows_icon" (Hệ điều hành Windows), "folder_icon" (Thư mục), "software_overview" (Các phần mềm máy tính).
-     * Toán học hình học: "shape_triangle", "shape_right_triangle", "shape_square", "shape_circle", "shape_rectangle", "shape_rhombus", "shape_parallelogram", "shape_trapezoid", "shape_quadrilateral", "shape_cube", "shape_rectangular_prism", "shape_cylinder", "shape_sphere", "angle_right", "angle_acute", "angle_obtuse", "segment_midpoint".
-     * Tiếng Việt dấu câu: "punc_period", "punc_question", "punc_exclamation", "punc_comma".
-     * Khoa học cơ quan: "organ_mouth_teeth", "organ_stomach", "organ_intestine", "organ_esophagus", "organ_heart", "organ_lungs".`;
+      const detectedGrade =
+        grade ||
+        (String(className).match(/[1-9]/) ? parseInt(String(className).match(/[1-9]/)![0], 10) : 4);
+      const targetAdvancedCount =
+        questionCount <= 5 ? 1 : questionCount <= 10 ? 2 : 3;
 
-      const promptText = `Nội dung trích xuất bài học:
-${content ? content : `Trọng tâm kiến thức: ${lessonTitle} - Môn ${subject || 'Kiến thức bài học'}`}
+      const systemInstruction = `Bạn là một Chuyên gia Giáo dục và Kiến trúc sư AI hàng đầu tại Việt Nam (Chương trình GDPT 2018 - Kết nối tri thức với cuộc sống, Chân trời sáng tạo, Cánh diều).
+Nhiệm vụ của bạn là đọc kỹ bài học "${lessonTitle}" thuộc môn "${subject}" (Khối ${detectedGrade} ${className ? `- Lớp ${className}` : ''}) và tài liệu Sách Giáo Khoa PDF đính kèm (nếu có) để biên soạn đúng ${questionCount} câu hỏi trắc nghiệm khách quan.
 
-Yêu cầu xuất JSON danh sách ${questionCount} câu hỏi bao quát toàn bộ bài học, kèm tên bài học IN HOA (lessonTitle). Ưu tiên cao các câu hỏi có hình ảnh trực quan chính xác ("question_image" hoặc "options_image"), câu nào không cần hình ảnh thì để "text_only". Tuân thủ nghiêm ngặt quy tắc: Khi câu hỏi hiển thị hình ảnh thì đáp án là văn bản; khi đáp án là các hình ảnh thì câu hỏi là văn bản.`;
+YÊU CẦU BẮT BUỘC TUYỆT ĐỐI:
+1. TRA CỨU ĐÚNG BÀI HỌC TRONG SÁCH GIÁO KHOA / PDF VÀ BÁM SÁT 100% NỘI DUNG BÀI HỌC:
+   - Nếu người dùng nhập vắn tắt như "Bài 1", "Bài 2", "Bài 3"... và tải lên file PDF sách giáo khoa: Hãy tìm trong Mục lục và các trang nội dung của file PDF xem "${lessonTitle}" là bài học gì, đọc TẤT CẢ các nội dung kiến thức trong bài học đó để tạo bộ câu hỏi trắc nghiệm.
+   - Xuất trường "lessonTitle" là tên đầy đủ, chính xác của bài học VIẾT IN HOA TOÀN BỘ (Ví dụ môn Công nghệ 4 Bài 3: "BÀI 3: VẬT LIỆU VÀ DỤNG CỤ TRỒNG HOA, CÂY CẢNH TRONG CHẬU").
+   - BÁM SÁT 100% MÔN HỌC "${subject}": Toàn bộ câu hỏi phải kiểm tra kiến thức của bài học đó trong môn "${subject}". NGHIÊM CẤM TUYỆT ĐỐI việc sinh câu hỏi lệch sang môn Tin học hay môn Toán khi người dùng đang chọn môn Công nghệ!
+
+2. BẮT BUỘC CÓ TỪ 1 ĐẾN 3 CÂU HỎI NÂNG CAO (difficulty = "nang_cao", isAdvanced = true):
+   - Trong bộ ${questionCount} câu hỏi phải có đúng ${targetAdvancedCount} câu hỏi nâng cao / vận dụng thực tế (đặt "difficulty": "nang_cao", "isAdvanced": true).
+   - Các câu hỏi nâng cao đặt học sinh vào tình huống thực hành, giải thích "Vì sao...", hoặc vận dụng kiến thức trong bài học vào thực tiễn đời sống.
+   - Các câu hỏi còn lại đặt "difficulty": "co_ban", "isAdvanced": false.
+
+3. ƯU TIÊN CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRONG CÂU HỎI HOẶC TRONG CÁC ĐÁP ÁN (HÌNH ẢNH CHỈ HIỂN THỊ 1 TRONG 2):
+   - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan (chiếm 75% - 85% số câu hỏi).
+   - Hình ảnh CHỈ ĐƯỢC HIỂN THỊ Ở 1 TRONG 2 NƠI:
+     + Chế độ 1 ("visualDisplayMode": "question_image"): Hình ảnh nằm ở câu hỏi -> 4 đáp án A, B, C, D BẮT BUỘC là văn bản thuần túy (optionVisuals = []).
+     + Chế độ 2 ("visualDisplayMode": "options_image"): Hình ảnh nằm ở cả 4 đáp án A, B, C, D -> Câu hỏi BẮT BUỘC là văn bản thuần túy (visualKey = "", visualData = "") và optionVisuals có đủ 4 mã hình ảnh cho 4 đáp án.
+     + Chế độ 3 ("visualDisplayMode": "text_only"): Câu hỏi lý thuyết thuần văn bản (visualKey = "", visualData = "", optionVisuals = []).
+   - Danh mục mã hình ảnh chuẩn ("visualKey" / "optionVisuals"):
+     * Môn Công nghệ: "flower_pot", "plant_flower", "cactus_succulent", "bonsai_tree", "soil_substrate", "garden_trowel", "garden_fork", "watering_can", "pruning_shears", "garden_gloves", "seed_sprout", "sunlight_care", "fertilizer_bag", "desk_lamp", "electric_fan", "television_set", "radio_set", "refrigerator", "telephone_emergency", "traffic_sign_stop", "paper_pinwheel", "wrench_screwdriver", "solar_wind_model".
+     * Môn Tin học: "cpu_tower", "monitor", "mouse", "keyboard", "speaker", "printer", "headphones", "usb_drive", "hard_drive", "power_cable", "mousepad", "laptop", "hardware_overview", "word_icon", "powerpoint_icon", "excel_icon", "paint_icon", "scratch_icon", "browser_icon", "windows_icon", "folder_icon", "software_overview".
+     * Môn Kỹ năng số: "strong_password", "shield_antivirus", "phishing_warning", "cloud_storage", "search_engine", "digital_citizenship", "ergonomic_posture".
+     * Môn Trí tuệ nhân tạo: "ai_robot", "neural_brain", "face_recognition", "voice_assistant", "smart_home_iot", "self_driving_car", "chatbot_prompt".`;
+
+      const promptText = `Thông tin bài học cần tạo câu hỏi:
+- Tên bài học người dùng nhập: "${lessonTitle}"
+- Môn học: ${subject}
+- Khối/Lớp: Khối ${detectedGrade} ${className ? `(Lớp ${className})` : ''}
+${content ? `- Nội dung / Ghi chú: ${content}` : ''}
+
+Hãy tìm đúng bài học "${lessonTitle}" của môn ${subject} (Khối ${detectedGrade}) trong tài liệu PDF / sách giáo khoa, đọc tất cả nội dung kiến thức trong bài và xuất JSON gồm:
+1. "lessonTitle" đầy đủ viết IN HOA.
+2. "questions": Đúng ${questionCount} câu hỏi trắc nghiệm bám sát 100% bài học môn ${subject}, trong đó có ${targetAdvancedCount} câu hỏi nâng cao ("isAdvanced": true, "difficulty": "nang_cao"), và ưu tiên các câu hỏi có hình ảnh minh họa trong câu hỏi hoặc trong các đáp án (chỉ hiển thị 1 trong 2).`;
 
       let contentsPayload: any = promptText;
       if (pdfBase64) {
@@ -117,102 +123,113 @@ Yêu cầu xuất JSON danh sách ${questionCount} câu hỏi bao quát toàn b�
         };
       }
 
-      const response = await activeAi.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: contentsPayload,
-        config: {
-          systemInstruction,
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              lessonTitle: { type: Type.STRING, description: 'Tên bài học đầy đủ viết IN HOA TOÀN BỘ' },
-              subject: { type: Type.STRING },
-              grade: { type: Type.NUMBER },
-              questions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    question: { type: Type.STRING, description: 'Nội dung câu hỏi rõ ràng, bao quát nội dung bài học' },
-                    options: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                      description: '4 phương án lựa chọn A, B, C, D',
-                    },
-                    visualDisplayMode: {
-                      type: Type.STRING,
-                      description: '"question_image" (câu hỏi có hình, đáp án là chữ), "options_image" (đáp án là 4 hình, câu hỏi là chữ), hoặc "text_only" (câu hỏi lý thuyết không cần hình)',
-                    },
-                    visualKey: {
-                      type: Type.STRING,
-                      description: 'Mã hình ảnh chính xác của câu hỏi khi visualDisplayMode = question_image',
-                    },
-                    optionVisuals: {
-                      type: Type.ARRAY,
-                      items: { type: Type.STRING },
-                      description: 'Mảng 4 mã hình ảnh chính xác cho 4 phương án A, B, C, D khi visualDisplayMode = options_image; để mảng rỗng [] khi visualDisplayMode = question_image hoặc text_only',
-                    },
-                    correctIndex: { type: Type.INTEGER, description: 'Chỉ số phương án đúng: 0, 1, 2, hoặc 3' },
-                    explanation: { type: Type.STRING, description: 'Giải thích ngắn gọn, dễ hiểu' },
-                    visualType: { type: Type.STRING, description: 'Loại hình minh họa: math_shape, diagram, emoji_icon, badge, animal, clock, number_line, fraction, balance_scale, experiment, computer_hardware, software_icon' },
-                    visualData: { type: Type.STRING, description: 'Biểu tượng/sơ đồ/con số trực quan hiển thị trong hình minh họa của câu hỏi' },
-                    points: { type: Type.INTEGER, description: 'Số điểm thường là 10' },
-                  },
-                  required: ['id', 'question', 'options', 'visualDisplayMode', 'optionVisuals', 'correctIndex', 'explanation', 'visualType', 'visualData'],
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          lessonTitle: { type: Type.STRING },
+          subject: { type: Type.STRING },
+          grade: { type: Type.NUMBER },
+          questions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                question: { type: Type.STRING },
+                options: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
                 },
+                difficulty: { type: Type.STRING },
+                isAdvanced: { type: Type.BOOLEAN },
+                visualDisplayMode: { type: Type.STRING },
+                visualKey: { type: Type.STRING },
+                optionVisuals: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                },
+                correctIndex: { type: Type.INTEGER },
+                explanation: { type: Type.STRING },
+                visualType: { type: Type.STRING },
+                visualData: { type: Type.STRING },
+                points: { type: Type.INTEGER },
               },
+              required: [
+                'id',
+                'question',
+                'options',
+                'difficulty',
+                'isAdvanced',
+                'visualDisplayMode',
+                'optionVisuals',
+                'correctIndex',
+                'explanation',
+                'visualType',
+                'visualData',
+              ],
             },
-            required: ['lessonTitle', 'questions'],
           },
         },
-      });
+        required: ['lessonTitle', 'questions'],
+      };
 
-      const responseText = response.text || '{}';
-      const parsedData = JSON.parse(responseText);
-      if (parsedData.lessonTitle) {
-        parsedData.lessonTitle = String(parsedData.lessonTitle).trim().toUpperCase();
-      } else {
-        parsedData.lessonTitle = String(lessonTitle || '').trim().toUpperCase();
+      let lastError: any = null;
+      for (const modelName of GEMINI_MODEL_CHAIN) {
+        try {
+          const response = await ai.models.generateContent({
+            model: modelName,
+            contents: contentsPayload,
+            config: {
+              systemInstruction,
+              responseMimeType: 'application/json',
+              responseSchema,
+            },
+          });
+
+          const responseText = response.text || '{}';
+          const parsedData = JSON.parse(responseText);
+          if (parsedData && Array.isArray(parsedData.questions) && parsedData.questions.length > 0) {
+            parsedData.lessonTitle = String(parsedData.lessonTitle || lessonTitle || '')
+              .trim()
+              .toUpperCase();
+            return res.json({
+              success: true,
+              data: parsedData,
+            });
+          }
+        } catch (err) {
+          lastError = err;
+          console.warn(`Server Gemini model ${modelName} failed, trying next:`, err);
+        }
       }
 
-      return res.json({
-        success: true,
-        data: parsedData,
-      });
+      throw lastError || new Error('All Gemini models failed');
     } catch (error: any) {
-      console.error('Lỗi gọi Gemini API:', error);
-      return res.status(500).json({
+      console.error('Gemini API extraction error:', error);
+      res.status(500).json({
         success: false,
-        error: error.message || 'Không thể tạo câu hỏi qua Gemini',
+        error: error.message || 'Lỗi khi trích xuất câu hỏi từ Gemini AI',
       });
     }
   });
 
-  // Vite middleware in dev or static files in production
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-    });
-  } else {
+  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        allowedHosts: true,
-        hmr: process.env.DISABLE_HMR !== 'true',
-      },
+      server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Rừng Cổ Thụ 10 Móc & Bà Già Bắt Gà server running on http://0.0.0.0:${PORT}`);
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer().catch((err) => {
-  console.error('Server startup error:', err);
-});
+startServer();

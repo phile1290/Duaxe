@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { QuizSet, Question, SubjectType } from '../../types';
 import { extractQuizWithGemini, normalizeQuestionVisuals } from '../../services/geminiClientService';
+import { buildSubjectCurriculumQuestions } from '../../services/curriculumFallbackBank';
 import { ALLOWED_SUBJECTS } from '../../services/classroomStorageService';
 import {
   QuestionVisualIllustration,
@@ -24,11 +25,9 @@ export const AiQuizGenerator: React.FC = () => {
 
   const [lessonTitle, setLessonTitle] = useState('');
   const [subject, setSubject] = useState<SubjectType>(ALLOWED_SUBJECTS[0]);
-  const [grade] = useState<number>(3);
+  const [grade, setGrade] = useState<number>(4);
   const [questionCount, setQuestionCount] = useState<number>(5);
-  const [rawText, setRawText] = useState<string>(
-    'Ví dụ nội dung bài học: Học sinh nhận biết các thiết bị phần cứng máy tính (màn hình, thân máy, bàn phím, chuột) và các phần mềm ứng dụng cơ bản.'
-  );
+  const [rawText, setRawText] = useState<string>('');
   const [pdfFileName, setPdfFileName] = useState<string | null>(null);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
 
@@ -58,7 +57,7 @@ export const AiQuizGenerator: React.FC = () => {
 
     try {
       const result = await extractQuizWithGemini({
-        lessonTitle,
+        lessonTitle: lessonTitle || 'Bài 3',
         subject,
         grade,
         questionCount,
@@ -66,95 +65,48 @@ export const AiQuizGenerator: React.FC = () => {
         pdfBase64,
       });
 
-      const resolvedUpperTitle = (result.resolvedLessonTitle || lessonTitle || 'BÀI HỌC').trim().toUpperCase();
+      const curriculumBackup = buildSubjectCurriculumQuestions({
+        lessonTitle: lessonTitle || 'Bài 3',
+        subject,
+        gradeOrClassName: grade,
+        questionCount,
+      });
+
+      const resolvedUpperTitle = (
+        result.resolvedLessonTitle ||
+        curriculumBackup.resolvedLessonTitle ||
+        lessonTitle ||
+        'BÀI HỌC'
+      )
+        .trim()
+        .toUpperCase();
       setLessonTitle(resolvedUpperTitle);
 
       if (result.success && result.questions && result.questions.length > 0) {
         setGeneratedQuestions(normalizeQuestionVisuals(result.questions));
-        setStatusMessage(`Đã tạo thành công bộ câu hỏi bao quát toàn bộ bài "${resolvedUpperTitle}"!`);
-      } else {
-        const baseTemplates: Question[] = [
-          {
-            id: `gen-${Date.now()}-1`,
-            question: `Theo bài "${resolvedUpperTitle}", kết quả của phép tính 6 × 4 bằng bao nhiêu?`,
-            options: ['24', '20', '28', '18'],
-            optionVisuals: [],
-            correctIndex: 0,
-            explanation: 'Chính xác! 6 nhân 4 bằng 24 theo bảng nhân 6.',
-            visualDisplayMode: 'question_image' as const,
-            visualType: 'number_line' as const,
-            visualData: '6 × 4 = ?',
-            points: 10,
-          },
-          {
-            id: `gen-${Date.now()}-2`,
-            question: 'Trong các đáp án dưới đây, đâu là biểu tượng của phần mềm soạn thảo văn bản Word?',
-            options: ['Phần mềm Word', 'Phần mềm PowerPoint', 'Phần mềm Excel', 'Phần mềm Paint'],
-            optionVisuals: ['word_icon', 'powerpoint_icon', 'excel_icon', 'paint_icon'],
-            correctIndex: 0,
-            explanation: 'Đúng rồi! Biểu tượng chữ W màu xanh dương là của phần mềm Microsoft Word.',
-            visualDisplayMode: 'options_image' as const,
-            visualType: 'software_icon' as const,
-            visualData: '',
-            points: 10,
-          },
-          {
-            id: `gen-${Date.now()}-3`,
-            question: 'Trong các đáp án dưới đây, hình nào là hình vuông có 4 cạnh bằng nhau?',
-            options: ['Hình vuông', 'Hình tam giác', 'Hình tròn', 'Hình chữ nhật'],
-            optionVisuals: ['shape_square', 'shape_triangle', 'shape_circle', 'shape_rectangle'],
-            correctIndex: 0,
-            explanation: 'Chính xác! Hình vuông có 4 góc vuông và 4 cạnh bằng nhau.',
-            visualDisplayMode: 'options_image' as const,
-            visualType: 'math_shape' as const,
-            visualData: '',
-            points: 10,
-          },
-          {
-            id: `gen-${Date.now()}-4`,
-            question: 'Biểu tượng trong hình ảnh bên là thiết bị phần cứng nào của máy tính?',
-            options: ['Màn hình máy tính', 'Thân máy tính', 'Chuột máy tính', 'Bàn phím máy tính'],
-            optionVisuals: [],
-            correctIndex: 0,
-            explanation: 'Xuất sắc! Hình ảnh bên là màn hình máy tính dùng để hiển thị thông tin.',
-            visualDisplayMode: 'question_image' as const,
-            visualType: 'computer_hardware' as const,
-            visualKey: 'monitor',
-            visualData: 'Màn hình máy tính',
-            points: 10,
-          },
-          {
-            id: `gen-${Date.now()}-5`,
-            question: 'Mẹ mua 5 vỉ trứng, mỗi vỉ có 6 quả trứng. Hỏi mẹ mua tất cả bao nhiêu quả trứng?',
-            options: ['25 quả trứng', '30 quả trứng', '35 quả trứng', '20 quả trứng'],
-            optionVisuals: [],
-            correctIndex: 1,
-            explanation: 'Hoan hô! 6 × 5 = 30 quả trứng.',
-            visualDisplayMode: 'question_image' as const,
-            visualType: 'emoji_icon' as const,
-            visualData: '6 🥚 × 5 = ?',
-            points: 10,
-          },
-        ];
-        const fallbackQs = Array.from({ length: questionCount }, (_, idx) => {
-          const tpl = baseTemplates[idx % baseTemplates.length];
-          return {
-            ...tpl,
-            id: `gen-${Date.now()}-${idx + 1}`,
-            question: idx < baseTemplates.length ? tpl.question : `Câu ${idx + 1}: ${tpl.question}`,
-          };
-        });
-
-        setGeneratedQuestions(fallbackQs);
         setStatusMessage(
-          result.message || `Đã tạo thành công bộ câu hỏi bao quát bài "${resolvedUpperTitle}"!`
+          `Đã tạo thành công bộ câu hỏi môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}" (kèm 1-3 câu hỏi nâng cao)!`
+        );
+      } else {
+        setGeneratedQuestions(normalizeQuestionVisuals(curriculumBackup.questions));
+        setStatusMessage(
+          result.message ||
+            `Đã tạo thành công bộ câu hỏi môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}"!`
         );
       }
     } catch (err: any) {
       console.error(err);
-      const upperTitle = (lessonTitle || 'BÀI HỌC').trim().toUpperCase();
-      setLessonTitle(upperTitle);
-      setStatusMessage('Đã tự động khởi tạo bộ câu hỏi sư phạm chuẩn hoá cho bài học.');
+      const curriculumBackup = buildSubjectCurriculumQuestions({
+        lessonTitle: lessonTitle || 'Bài 3',
+        subject,
+        gradeOrClassName: grade,
+        questionCount,
+      });
+      setLessonTitle(curriculumBackup.resolvedLessonTitle);
+      setGeneratedQuestions(normalizeQuestionVisuals(curriculumBackup.questions));
+      setStatusMessage(
+        `Đã khởi tạo bộ câu hỏi chuẩn Chương trình GDPT 2018 cho bài "${curriculumBackup.resolvedLessonTitle}".`
+      );
     } finally {
       setIsLoading(false);
     }
@@ -180,6 +132,10 @@ export const AiQuizGenerator: React.FC = () => {
     setViewMode('classroom');
   };
 
+  const advancedCount = generatedQuestions.filter(
+    (q) => q.isAdvanced || q.difficulty === 'nang_cao'
+  ).length;
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -187,13 +143,13 @@ export const AiQuizGenerator: React.FC = () => {
         <div>
           <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider mb-1">
             <Sparkles className="w-4 h-4" />
-            <span>Gemini RAG Module • Trích xuất sách giáo khoa</span>
+            <span>Gemini RAG Module • Trích xuất sách giáo khoa chuẩn GDPT 2018</span>
           </div>
           <h2 className="text-2xl font-black text-white">
             Tạo Câu Hỏi Trắc Nghiệm Tự Động Từ Sách Giáo Khoa (PDF)
           </h2>
           <p className="text-sm text-slate-300 mt-1">
-            Tải lên tài liệu PDF hoặc nhập bài học. AI Gemini sẽ tự động phân tích vùng kiến thức và sinh bộ câu hỏi kèm hình ảnh to rõ ràng cho câu hỏi và cả 4 đáp án đồng nhất.
+            Tải lên tài liệu PDF hoặc nhập số bài học (VD: Bài 3). Hệ thống tự động tìm đúng bài học trong SGK của môn học đã chọn, sinh bộ câu hỏi kèm từ 1 đến 3 câu hỏi nâng cao và ưu tiên hình ảnh minh họa (hiển thị 1 trong 2 vị trí).
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-2.5">
@@ -228,26 +184,45 @@ export const AiQuizGenerator: React.FC = () => {
               type="text"
               value={lessonTitle}
               onChange={(e) => setLessonTitle(e.target.value)}
-              placeholder='Chỉ cần nhập "Bài 1", "Bài 2" hoặc tên bài...'
+              placeholder='Ví dụ: "Bài 3" hoặc tên bài học...'
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500 placeholder:text-slate-500"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-              Môn học (4 lựa chọn chuyên biệt):
-            </label>
-            <select
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-indigo-500"
-            >
-              {ALLOWED_SUBJECTS.map((subjItem) => (
-                <option key={subjItem} value={subjItem}>
-                  {subjItem}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                Môn học (4 lựa chọn):
+              </label>
+              <select
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-indigo-500"
+              >
+                {ALLOWED_SUBJECTS.map((subjItem) => (
+                  <option key={subjItem} value={subjItem}>
+                    {subjItem}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
+                Khối lớp:
+              </label>
+              <select
+                value={grade}
+                onChange={(e) => setGrade(Number(e.target.value))}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-indigo-500"
+              >
+                {[3, 4, 5].map((g) => (
+                  <option key={g} value={g}>
+                    Khối {g}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
@@ -260,7 +235,7 @@ export const AiQuizGenerator: React.FC = () => {
                   key={num}
                   type="button"
                   onClick={() => setQuestionCount(num)}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${
+                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                     questionCount === num
                       ? 'bg-indigo-600 text-white shadow-md'
                       : 'bg-slate-800 text-slate-400 hover:text-white'
@@ -300,13 +275,13 @@ export const AiQuizGenerator: React.FC = () => {
 
           <div>
             <label className="block text-xs font-bold text-slate-300 uppercase mb-1.5">
-              Hoặc dán đoạn trích kiến thức bài học:
+              Hoặc dán đoạn trích kiến thức bài học (tùy chọn):
             </label>
             <textarea
               rows={3}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="Dán nội dung sách giáo khoa hoặc tóm tắt kiến thức giáo viên muốn kiểm tra..."
+              placeholder="Dán nội dung sách giáo khoa hoặc ghi chú trọng tâm bài học (nếu có)..."
               className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-white text-xs focus:outline-none focus:border-indigo-500"
             />
           </div>
@@ -319,7 +294,7 @@ export const AiQuizGenerator: React.FC = () => {
             {isLoading ? (
               <>
                 <RefreshCw className="w-5 h-5 animate-spin" />
-                <span>AI Đang Phân Tích & Sinh Câu Hỏi...</span>
+                <span>AI Đang Phân Tích Bài Học & Sinh Câu Hỏi...</span>
               </>
             ) : (
               <>
@@ -339,18 +314,25 @@ export const AiQuizGenerator: React.FC = () => {
 
         {/* Right Column: Generated Questions Preview (7 cols) */}
         <div className="lg:col-span-7 bg-slate-900 p-6 rounded-3xl border border-slate-800 flex flex-col shadow-xl">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4 gap-2 flex-wrap">
             <div>
-              <h3 className="font-extrabold text-white text-base">
-                Xem Trước Bộ Câu Hỏi Trắc Nghiệm ({generatedQuestions.length} câu)
-              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-extrabold text-white text-base">
+                  Xem Trước Bộ Câu Hỏi Trắc Nghiệm ({generatedQuestions.length} câu)
+                </h3>
+                {generatedQuestions.length > 0 && (
+                  <span className="text-xs font-black bg-purple-600/90 border border-purple-300/60 text-white px-2.5 py-0.5 rounded-lg">
+                    🌟 {advancedCount} câu nâng cao
+                  </span>
+                )}
+              </div>
               {lessonTitle && (
                 <div className="text-xs font-black text-amber-300 uppercase mt-0.5">
-                  TÊN BÀI HỌC: {lessonTitle.toUpperCase()}
+                  MÔN {subject.toUpperCase()} (KHỐI {grade}) • {lessonTitle.toUpperCase()}
                 </div>
               )}
               <p className="text-xs text-slate-300">
-                Nguyên tắc bắt buộc: Khi câu hỏi có hình ảnh thì đáp án là văn bản • Khi đáp án là hình ảnh thì câu hỏi là văn bản
+                Ưu tiên minh họa trực quan (chỉ hiển thị 1 trong 2 vị trí: ở câu hỏi hoặc ở 4 đáp án) • Có từ 1 đến 3 câu nâng cao
               </p>
             </div>
 
@@ -369,7 +351,7 @@ export const AiQuizGenerator: React.FC = () => {
               <HelpCircle className="w-12 h-12 text-slate-400 mb-3" />
               <p className="text-sm font-semibold">Chưa có câu hỏi nào được tạo</p>
               <p className="text-xs text-slate-300 max-w-sm mt-1">
-                Nhập tên bài học bên trái và bấm "Kích hoạt Gemini trích xuất" để AI tạo bộ câu hỏi ngay tức thì.
+                Chọn môn học, nhập tên bài học bên trái và bấm "Kích hoạt Gemini trích xuất" để AI tạo bộ câu hỏi ngay tức thì.
               </p>
             </div>
           ) : (
@@ -378,14 +360,33 @@ export const AiQuizGenerator: React.FC = () => {
                 const qMode = resolveVisualDisplayMode(q);
                 const showQImg = qMode === 'question_image';
                 const uniformOpts = qMode === 'options_image' ? getUniformOptionVisuals(q) : null;
+                const isAdv = Boolean(q.isAdvanced || q.difficulty === 'nang_cao');
                 return (
                   <div
                     key={q.id || qIdx}
-                    className="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/80 text-left space-y-2.5"
+                    className={`rounded-2xl p-4 border text-left space-y-2.5 ${
+                      isAdv
+                        ? 'bg-gradient-to-br from-purple-950/60 via-slate-800/90 to-slate-900 border-purple-400/70'
+                        : 'bg-slate-800/80 border-slate-700/80'
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-xs font-black bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md">
-                        Câu {qIdx + 1}
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-md">
+                          Câu {qIdx + 1}
+                        </span>
+                        {isAdv && (
+                          <span className="text-[11px] font-black bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2.5 py-0.5 rounded-md shadow">
+                            🌟 CÂU HỎI NÂNG CAO
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded-md">
+                        {showQImg
+                          ? '🖼️ Hình trong câu hỏi'
+                          : uniformOpts
+                          ? '🖼️ Hình trong 4 đáp án'
+                          : '📝 Câu hỏi kiến thức'}
                       </span>
                     </div>
 

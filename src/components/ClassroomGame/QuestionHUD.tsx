@@ -200,11 +200,22 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         <div
           className={`${
             showQuestionImage ? 'lg:col-span-8' : 'lg:col-span-12'
-          } flex items-start gap-2 bg-slate-950/70 border border-slate-800 rounded-xl p-2 sm:p-2.5`}
+          } flex flex-col gap-1 bg-slate-950/70 border ${
+            question.isAdvanced || question.difficulty === 'nang_cao'
+              ? 'border-purple-400/80 shadow-[0_0_15px_rgba(168,85,247,0.25)]'
+              : 'border-slate-800'
+          } rounded-xl p-2 sm:p-2.5`}
         >
-          <span className="text-[10px] sm:text-xs bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shrink-0">
-            CÂU {questionNumber}
-          </span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] sm:text-xs bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shrink-0">
+              CÂU {questionNumber}
+            </span>
+            {(question.isAdvanced || question.difficulty === 'nang_cao') && (
+              <span className="text-[10px] sm:text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black px-2 py-0.5 rounded-md shrink-0 shadow">
+                🌟 CÂU HỎI NÂNG CAO
+              </span>
+            )}
+          </div>
           <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-white leading-snug">
             {question.question}
           </h2>

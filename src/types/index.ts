@@ -11,6 +11,13 @@ export interface Question {
   correctIndex: number;
   explanation: string;
   /**
+   * Phân loại mức độ câu hỏi:
+   * - 'co_ban': Câu hỏi nhận biết, thông hiểu kiến thức bài học
+   * - 'nang_cao': Câu hỏi vận dụng, nâng cao, xử lý tình huống thực tiễn (từ 1 đến 3 câu trong mỗi bộ đề)
+   */
+  difficulty?: 'co_ban' | 'nang_cao';
+  isAdvanced?: boolean;
+  /**
    * Nguyên tắc bắt buộc:
    * - 'question_image': Câu hỏi hiển thị hình ảnh minh họa -> 4 đáp án A, B, C, D chỉ hiển thị VĂN BẢN.
    * - 'options_image': 4 đáp án A, B, C, D là các hình ảnh đồng nhất -> Câu hỏi chỉ hiển thị VĂN BẢN.
@@ -30,6 +37,9 @@ export interface Question {
     | 'experiment'
     | 'computer_hardware'
     | 'software_icon'
+    | 'technology_tool'
+    | 'digital_skill'
+    | 'ai_concept'
     | 'none';
   visualPrompt?: string;
   visualData?: string;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GameMode, Question, RaceSetupConfig } from '../../types';
 import { useGameStore } from '../../store/gameStore';
 import { extractQuizWithGemini, getStoredApiKey, normalizeQuestionVisuals } from '../../services/geminiClientService';
+import { buildSubjectCurriculumQuestions } from '../../services/curriculumFallbackBank';
 import {
   ALLOWED_SUBJECTS,
   getSavedClassesFromLocalStorage,
@@ -695,193 +696,66 @@ export const RaceSetupModal: React.FC<RaceSetupModalProps> = ({
 
     // Case 2: Extract new questions with Gemini AI / PDF covering 100% of lesson content with visual illustrations
     setIsLoading(true);
-    setStatusMessage(`AI Gemini đang phân tích toàn bộ nội dung "${upperLessonInput}" (Môn ${subject}) và tạo câu hỏi kèm hình ảnh...`);
+    const detectedGradeNum =
+      extractGradeFromClass(activeGrp?.gradeName || cleanClassName) || 4;
+    setStatusMessage(
+      `AI Gemini đang phân tích nội dung "${upperLessonInput}" (Môn ${subject} - Khối ${detectedGradeNum}) và tạo câu hỏi kèm hình ảnh & 1-3 câu nâng cao...`
+    );
 
     try {
       const res = await extractQuizWithGemini({
         lessonTitle: rawLessonInput,
         subject,
+        grade: detectedGradeNum,
         className: cleanClassName,
         questionCount,
-        content: `Bao quát toàn bộ nội dung bài học từ đầu đến cuối: ${upperLessonInput} - Môn ${subject || 'Tin học'} (${cleanClassName}). Tài liệu: ${pdfFileName || 'Sách giáo khoa'}`,
+        content: `Bám sát 100% nội dung bài học "${upperLessonInput}" của môn ${subject} (Khối ${detectedGradeNum} - Lớp ${cleanClassName}). Tài liệu tải lên: ${pdfFileName || 'Sách giáo khoa GDPT 2018'}. Bắt buộc có từ 1 đến 3 câu hỏi nâng cao và ưu tiên hình ảnh minh họa (chỉ hiển thị 1 trong 2 nơi: ở câu hỏi hoặc ở 4 đáp án).`,
         pdfBase64,
       });
 
-      const resolvedUpperTitle = (res.resolvedLessonTitle || upperLessonInput).trim().toUpperCase();
-      const isInformatics = /tin học|kỹ năng số|trí tuệ nhân tạo|máy tính|phần cứng|phần mềm/i.test(`${subject} ${resolvedUpperTitle}`);
-
-      const informaticsTemplates: Omit<Question, 'id'>[] = [
-        {
-          question: 'Biểu tượng chữ W màu xanh trong hình ảnh bên là của phần mềm gì?',
-          options: ['Word', 'PowerPoint', 'Excel', 'Paint'],
-          correctIndex: 0,
-          explanation: 'Chính xác! Biểu tượng chữ W màu xanh dương là của phần mềm soạn thảo văn bản Microsoft Word.',
-          visualDisplayMode: 'question_image',
-          visualType: 'software_icon',
-          visualKey: 'word_icon',
-          visualData: 'Microsoft Word',
-          optionVisuals: [],
-          points: 10,
-        },
-        {
-          question: 'Trong các đáp án dưới đây, đâu là phần cứng máy tính?',
-          options: ['Thân máy tính', 'Phần mềm Word', 'Phần mềm PowerPoint', 'Phần mềm Excel'],
-          correctIndex: 0,
-          explanation: 'Xuất sắc! Thân máy tính là thiết bị phần cứng máy tính; Word, PowerPoint, Excel là các phần mềm.',
-          visualDisplayMode: 'options_image',
-          visualType: 'computer_hardware',
-          visualData: '',
-          optionVisuals: ['cpu_tower', 'word_icon', 'powerpoint_icon', 'excel_icon'],
-          points: 10,
-        },
-        {
-          question: 'Trong các đáp án dưới đây, thiết bị nào là chuột máy tính giúp điều khiển con trỏ trên màn hình?',
-          options: ['Thân máy tính', 'Màn hình máy tính', 'Chuột máy tính', 'Phần mềm PowerPoint'],
-          correctIndex: 2,
-          explanation: 'Hoan hô! Đáp án C là hình ảnh chuột máy tính giúp điều khiển con trỏ trên màn hình.',
-          visualDisplayMode: 'options_image',
-          visualType: 'computer_hardware',
-          visualData: '',
-          optionVisuals: ['cpu_tower', 'monitor', 'mouse', 'powerpoint_icon'],
-          points: 10,
-        },
-        {
-          question: 'Thiết bị trong hình ảnh bên là bộ phận nào của máy tính để bàn?',
-          options: ['Bàn phím máy tính', 'Màn hình máy tính', 'Loa máy tính', 'Máy in'],
-          correctIndex: 0,
-          explanation: 'Chính xác! Đây là bàn phím máy tính dùng để gõ chữ và số vào máy tính.',
-          visualDisplayMode: 'question_image',
-          visualType: 'computer_hardware',
-          visualKey: 'keyboard',
-          visualData: 'Bàn phím máy tính',
-          optionVisuals: [],
-          points: 10,
-        },
-        {
-          question: 'Phát biểu nào sau đây nêu đúng vai trò của phần mềm máy tính đối với phần cứng?',
-          options: [
-            'Phần mềm là các chương trình điều khiển phần cứng hoạt động để phục vụ người dùng',
-            'Phần mềm là dây cáp nối màn hình với nguồn điện trong phòng học',
-            'Phần mềm là tấm lót chuột đặt trên bàn làm việc',
-            'Phần mềm là vỏ thùng máy tính bằng kim loại',
-          ],
-          correctIndex: 0,
-          explanation: 'Đúng rồi! Phần mềm là các chương trình được cài đặt giúp điều khiển phần cứng máy tính hoạt động.',
-          visualDisplayMode: 'text_only',
-          visualType: 'none',
-          visualData: '',
-          optionVisuals: [],
-          points: 10,
-        },
-      ];
-
-      const generalTemplates: Omit<Question, 'id'>[] = [
-        {
-          question: `Trong môn ${subject}, khi sử dụng thiết bị học tập và công nghệ, quy tắc nào dưới đây đảm bảo an toàn?`,
-          options: [
-            'Thực hiện đúng hướng dẫn sử dụng và không chạm tay ướt vào ổ điện',
-            'Tự ý tháo rời thiết bị khi đang cắm nguồn điện',
-            'Để nước uống ngay sát thiết bị điện tử',
-            'Kéo căng dây nguồn khi rút phích cắm',
-          ],
-          correctIndex: 0,
-          explanation: 'Chính xác! Tuân thủ hướng dẫn và giữ tay khô ráo khi sử dụng thiết bị điện giúp đảm bảo an toàn.',
-          visualDisplayMode: 'text_only',
-          visualType: 'none',
-          visualData: '',
-          optionVisuals: [],
-          points: 10,
-        },
-        {
-          question: `Trong các đáp án dưới đây, đâu là màn hình giúp hiển thị hình ảnh và thông tin?`,
-          options: [
-            'Màn hình hiển thị',
-            'Thân máy tính',
-            'Chuột điều khiển',
-            'Bàn phím nhập liệu',
-          ],
-          correctIndex: 0,
-          explanation: 'Rất giỏi! Màn hình là thiết bị dùng để hiển thị hình ảnh và thông tin.',
-          visualDisplayMode: 'options_image',
-          visualType: 'computer_hardware',
-          visualData: '',
-          optionVisuals: ['monitor', 'cpu_tower', 'mouse', 'keyboard'],
-          points: 10,
-        },
-        {
-          question: `Đồng hồ trong hình bên chỉ mấy giờ khi kim ngắn chỉ số 8 và kim dài chỉ số 3?`,
-          options: [
-            '8 giờ 15 phút',
-            '6 giờ 30 phút',
-            '9 giờ 00 phút',
-            '10 giờ 45 phút',
-          ],
-          correctIndex: 0,
-          explanation: `Tuyệt vời! Kim ngắn chỉ số 8, kim dài chỉ số 3 là 8 giờ 15 phút!`,
-          visualDisplayMode: 'question_image',
-          visualType: 'clock',
-          visualData: '8:15',
-          optionVisuals: [],
-          points: 10,
-        },
-        {
-          question: `Thiết bị trong hình ảnh bên dùng để làm gì khi thao tác với máy tính?`,
-          options: [
-            'Điều khiển con trỏ và chọn đối tượng trên màn hình',
-            'Phát âm thanh ra ngoài phòng học',
-            'In văn bản ra giấy trắng',
-            'Cung cấp nguồn điện dự phòng',
-          ],
-          correctIndex: 0,
-          explanation: 'Xuất sắc! Chuột máy tính giúp điều khiển con trỏ và chọn các biểu tượng trên màn hình!',
-          visualDisplayMode: 'question_image',
-          visualType: 'computer_hardware',
-          visualKey: 'mouse',
-          visualData: 'Chuột máy tính',
-          optionVisuals: [],
-          points: 10,
-        },
-        {
-          question: `Vì sao chúng ta cần sắp xếp góc học tập và bảo quản sản phẩm công nghệ gọn gàng, sạch sẽ?`,
-          options: [
-            'Giúp thiết bị bền đẹp, hoạt động tốt và thuận tiện khi học tập',
-            'Làm cho thiết bị tốn nhiều điện năng hơn',
-            'Khiến việc tìm kiếm đồ dùng mất nhiều thời gian hơn',
-            'Không mang lại lợi ích gì cho người sử dụng',
-          ],
-          correctIndex: 0,
-          explanation: 'Chính xác! Bảo quản cẩn thận và sắp xếp gọn gàng giúp thiết bị bền đẹp và học tập hiệu quả.',
-          visualDisplayMode: 'text_only',
-          visualType: 'none',
-          visualData: '',
-          optionVisuals: [],
-          points: 10,
-        },
-      ];
-
-      const activeTemplates = isInformatics ? informaticsTemplates : generalTemplates;
-      const fallbackQuestions: Question[] = Array.from({ length: Math.max(questionCount, 5) }, (_, idx) => {
-        const tpl = activeTemplates[idx % activeTemplates.length];
-        return {
-          ...tpl,
-          id: `q-gen-${idx + 1}`,
-        };
+      const curriculumBackup = buildSubjectCurriculumQuestions({
+        lessonTitle: rawLessonInput,
+        subject,
+        gradeOrClassName: activeGrp?.gradeName || cleanClassName,
+        questionCount,
       });
+
+      const resolvedUpperTitle = (
+        res.resolvedLessonTitle ||
+        curriculumBackup.resolvedLessonTitle ||
+        upperLessonInput
+      )
+        .trim()
+        .toUpperCase();
 
       const finalQuestions: Question[] =
         res.success && res.questions && res.questions.length > 0
           ? normalizeQuestionVisuals(res.questions)
-          : fallbackQuestions.slice(0, questionCount);
+          : normalizeQuestionVisuals(curriculumBackup.questions);
 
       setLessonTitle(resolvedUpperTitle);
       setPreviewQuestions(finalQuestions);
       setPendingConfig({
         ...setupConfig,
+        grade: detectedGradeNum,
         lessonTitle: resolvedUpperTitle,
       });
     } catch (err: any) {
       console.error(err);
-      setStatusMessage('Đã tự động khởi tạo bộ câu hỏi đề xuất sư phạm.');
+      const curriculumBackup = buildSubjectCurriculumQuestions({
+        lessonTitle: rawLessonInput,
+        subject,
+        gradeOrClassName: activeGrp?.gradeName || cleanClassName,
+        questionCount,
+      });
+      const resolvedUpperTitle = curriculumBackup.resolvedLessonTitle;
+      setLessonTitle(resolvedUpperTitle);
+      setPreviewQuestions(normalizeQuestionVisuals(curriculumBackup.questions));
+      setPendingConfig({
+        ...setupConfig,
+        grade: detectedGradeNum,
+        lessonTitle: resolvedUpperTitle,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -1029,14 +903,19 @@ export const RaceSetupModal: React.FC<RaceSetupModalProps> = ({
                     <Sparkles className="w-4 h-4 text-amber-400" />
                     ĐÃ TẠO BỘ {previewQuestions.length} CÂU HỎI ({pendingConfig.subject}):
                   </span>
-                  <span className="text-[11px] text-slate-300">
-                    {activeGradeGroupObj ? (
-                      <>
-                        Khối: <strong className="text-amber-300">{activeGradeGroupObj.gradeName}</strong> •{' '}
-                      </>
-                    ) : null}
-                    Lớp: <strong className="text-white">{pendingConfig.className}</strong>
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="bg-purple-600/90 border border-purple-300/60 text-white px-2 py-0.5 rounded-lg font-black">
+                      🌟 {previewQuestions.filter((q) => q.isAdvanced || q.difficulty === 'nang_cao').length} câu nâng cao
+                    </span>
+                    <span className="text-slate-300">
+                      {activeGradeGroupObj ? (
+                        <>
+                          Khối: <strong className="text-amber-300">{activeGradeGroupObj.gradeName}</strong> •{' '}
+                        </>
+                      ) : null}
+                      Lớp: <strong className="text-white">{pendingConfig.className}</strong>
+                    </span>
+                  </div>
                 </div>
 
                 {/* ACCURATE UPPERCASE LESSON TITLE DISPLAY */}
@@ -1056,13 +935,38 @@ export const RaceSetupModal: React.FC<RaceSetupModalProps> = ({
                   const qMode = resolveVisualDisplayMode(q);
                   const showQImg = qMode === 'question_image';
                   const uniformOpts = qMode === 'options_image' ? getUniformOptionVisuals(q) : null;
+                  const isAdv = Boolean(q.isAdvanced || q.difficulty === 'nang_cao');
                   return (
-                    <div key={q.id || idx} className="bg-slate-800/90 border border-slate-700 p-3 rounded-2xl space-y-2 text-xs">
-                      <div className="font-bold text-amber-300 flex items-start gap-1.5">
-                        <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black shrink-0">
-                          Câu {idx + 1}
+                    <div
+                      key={q.id || idx}
+                      className={`p-3 rounded-2xl space-y-2 text-xs border ${
+                        isAdv
+                          ? 'bg-gradient-to-br from-purple-950/70 via-slate-800/95 to-slate-900 border-purple-400/70'
+                          : 'bg-slate-800/90 border-slate-700'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="bg-amber-400 text-slate-950 text-[10px] px-2 py-0.5 rounded font-black shrink-0">
+                            Câu {idx + 1}
+                          </span>
+                          {isAdv && (
+                            <span className="bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] px-2 py-0.5 rounded-md font-black shrink-0 shadow">
+                              🌟 CÂU HỎI NÂNG CAO
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded-md">
+                          {showQImg
+                            ? '🖼️ Minh họa trong câu hỏi'
+                            : uniformOpts
+                            ? '🖼️ Minh họa trong 4 đáp án'
+                            : '📝 Câu hỏi kiến thức'}
                         </span>
-                        <span className="text-white font-extrabold text-xs sm:text-sm">{q.question}</span>
+                      </div>
+
+                      <div className="text-white font-extrabold text-xs sm:text-sm leading-snug">
+                        {q.question}
                       </div>
 
                       {showQImg && (

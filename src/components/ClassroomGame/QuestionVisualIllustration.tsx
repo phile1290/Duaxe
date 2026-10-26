@@ -60,6 +60,47 @@ export type SemanticTopicKey =
   | 'windows_icon'
   | 'folder_icon'
   | 'software_overview'
+  // Công nghệ - Hoa, cây cảnh, chậu, giá thể & dụng cụ làm vườn (Công nghệ 4)
+  | 'flower_pot'
+  | 'plant_flower'
+  | 'cactus_succulent'
+  | 'bonsai_tree'
+  | 'soil_substrate'
+  | 'garden_trowel'
+  | 'garden_fork'
+  | 'watering_can'
+  | 'pruning_shears'
+  | 'garden_gloves'
+  | 'seed_sprout'
+  | 'sunlight_care'
+  | 'fertilizer_bag'
+  // Công nghệ - Thiết bị gia đình, thủ công & mô hình kỹ thuật (Công nghệ 3, 4, 5)
+  | 'desk_lamp'
+  | 'electric_fan'
+  | 'television_set'
+  | 'radio_set'
+  | 'refrigerator'
+  | 'telephone_emergency'
+  | 'traffic_sign_stop'
+  | 'paper_pinwheel'
+  | 'wrench_screwdriver'
+  | 'solar_wind_model'
+  // Kỹ năng số - An toàn mạng & Công dân số
+  | 'strong_password'
+  | 'shield_antivirus'
+  | 'phishing_warning'
+  | 'cloud_storage'
+  | 'search_engine'
+  | 'digital_citizenship'
+  | 'ergonomic_posture'
+  // Trí tuệ nhân tạo (AI)
+  | 'ai_robot'
+  | 'neural_brain'
+  | 'face_recognition'
+  | 'voice_assistant'
+  | 'smart_home_iot'
+  | 'self_driving_car'
+  | 'chatbot_prompt'
   // Toán học - Hình học
   | 'shape_triangle'
   | 'shape_right_triangle'
@@ -124,6 +165,43 @@ export function detectSemanticTopicKey(rawText: string, fallbackKey?: string): S
     'windows_icon',
     'folder_icon',
     'software_overview',
+    'flower_pot',
+    'plant_flower',
+    'cactus_succulent',
+    'bonsai_tree',
+    'soil_substrate',
+    'garden_trowel',
+    'garden_fork',
+    'watering_can',
+    'pruning_shears',
+    'garden_gloves',
+    'seed_sprout',
+    'sunlight_care',
+    'fertilizer_bag',
+    'desk_lamp',
+    'electric_fan',
+    'television_set',
+    'radio_set',
+    'refrigerator',
+    'telephone_emergency',
+    'traffic_sign_stop',
+    'paper_pinwheel',
+    'wrench_screwdriver',
+    'solar_wind_model',
+    'strong_password',
+    'shield_antivirus',
+    'phishing_warning',
+    'cloud_storage',
+    'search_engine',
+    'digital_citizenship',
+    'ergonomic_posture',
+    'ai_robot',
+    'neural_brain',
+    'face_recognition',
+    'voice_assistant',
+    'smart_home_iot',
+    'self_driving_car',
+    'chatbot_prompt',
     'shape_triangle',
     'shape_right_triangle',
     'shape_square',
@@ -158,7 +236,394 @@ export function detectSemanticTopicKey(rawText: string, fallbackKey?: string): S
     if (fallbackKey === k || hasWholeWord(combined, k)) return k;
   }
 
-  // 1. TIN HỌC: Phần mềm & Biểu tượng ứng dụng (Ưu tiên kiểm tra tên phần mềm cụ thể trước)
+  // 1. MÔN CÔNG NGHỆ: Trồng hoa, cây cảnh trong chậu, dụng cụ làm vườn, thiết bị gia đình, mô hình kỹ thuật
+  if (
+    hasAnyWholeWord(combined, [
+      'bình tưới cây',
+      'bình tưới nước',
+      'bình tưới hoa sen',
+      'bình xịt tưới cây',
+      'bình tưới',
+      'tưới nước cho cây',
+    ])
+  ) {
+    return 'watering_can';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'xẻng nhỏ',
+      'xẻng làm vườn',
+      'xẻng xúc đất',
+      'xẻng xúc giá thể',
+      'cái xẻng',
+    ])
+  ) {
+    return 'garden_trowel';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'chĩa ba',
+      'cào đất',
+      'dụng cụ xới đất',
+      'chĩa làm vườn',
+    ])
+  ) {
+    return 'garden_fork';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'kéo cắt cành',
+      'kéo tỉa lá',
+      'kéo tỉa cành',
+      'kéo làm vườn',
+    ])
+  ) {
+    return 'pruning_shears';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'găng tay làm vườn',
+      'găng tay bảo hộ',
+      'đeo găng tay',
+      'đôi găng tay',
+    ])
+  ) {
+    return 'garden_gloves';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'giá thể trồng cây',
+      'giá thể',
+      'xơ dừa',
+      'trấu hun',
+      'mùn cưa',
+      'đất trồng cây',
+      'sỏi dăm',
+    ])
+  ) {
+    return 'soil_substrate';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'chậu trồng cây',
+      'chậu trồng hoa',
+      'chậu đất nung',
+      'chậu sứ',
+      'chậu nhựa',
+      'lỗ thoát nước ở đáy chậu',
+      'đáy chậu',
+    ])
+  ) {
+    return 'flower_pot';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'cây xương rồng',
+      'xương rồng',
+      'cây sen đá',
+      'sen đá',
+    ])
+  ) {
+    return 'cactus_succulent';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'cây cảnh lá',
+      'cây trầu bà',
+      'cây lưỡi hổ',
+      'cây vạn niên thanh',
+      'cây bonsai',
+      'cây xanh trong chậu',
+    ])
+  ) {
+    return 'bonsai_tree';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'chậu hoa',
+      'cây hoa hồng',
+      'cây hoa cúc',
+      'hoa đồng tiền',
+      'hoa mười giờ',
+      'hoa dạ yến thảo',
+      'hoa trạng nguyên',
+      'hoa đào',
+      'hoa mai',
+    ])
+  ) {
+    return 'plant_flower';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'gieo hạt',
+      'hạt giống',
+      'cây con',
+      'nảy mầm',
+      'trồng cây con',
+    ])
+  ) {
+    return 'seed_sprout';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'bón phân',
+      'phân bón',
+      'phân hữu cơ',
+      'phân vi sinh',
+    ])
+  ) {
+    return 'fertilizer_bag';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'đèn học',
+      'chụp đèn',
+      'bóng đèn học',
+      'công tắc đèn',
+      'sử dụng đèn học',
+    ])
+  ) {
+    return 'desk_lamp';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'quạt điện',
+      'cánh quạt',
+      'lồng quạt',
+      'quạt bàn',
+      'quạt cây',
+      'sử dụng quạt điện',
+    ])
+  ) {
+    return 'electric_fan';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'máy thu hình',
+      'ti vi',
+      'tivi',
+      'truyền hình',
+    ])
+  ) {
+    return 'television_set';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'máy thu thanh',
+      'đài radio',
+      'radio',
+      'phát thanh',
+    ])
+  ) {
+    return 'radio_set';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'tủ lạnh',
+      'ngăn đá',
+      'ngăn mát',
+      'bảo quản thực phẩm trong tủ lạnh',
+    ])
+  ) {
+    return 'refrigerator';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'số điện thoại khẩn cấp',
+      'gọi 113',
+      'gọi 114',
+      'gọi 115',
+      'gọi 111',
+      'sử dụng điện thoại',
+    ])
+  ) {
+    return 'telephone_emergency';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'biển báo giao thông',
+      'biển báo cấm',
+      'biển báo nguy hiểm',
+      'biển hiệu lệnh',
+      'biển chỉ dẫn',
+    ])
+  ) {
+    return 'traffic_sign_stop';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'chong chóng',
+      'làm chong chóng',
+      'đồ chơi dân gian',
+      'đèn lồng giấy',
+    ])
+  ) {
+    return 'paper_pinwheel';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'cờ-lê',
+      'cờ lê',
+      'tua-vít',
+      'tua vít',
+      'ốc vít',
+      'bộ lắp ghép mô hình kỹ thuật',
+      'lắp ghép mô hình',
+    ])
+  ) {
+    return 'wrench_screwdriver';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'điện mặt trời',
+      'pin mặt trời',
+      'điện gió',
+      'tua bin gió',
+      'năng lượng tái tạo',
+    ])
+  ) {
+    return 'solar_wind_model';
+  }
+
+  // 2. MÔN TRÍ TUỆ NHÂN TẠO (AI) & KỸ NĂNG SỐ
+  if (
+    hasAnyWholeWord(combined, [
+      'robot thông minh',
+      'robot ai',
+      'người máy thông minh',
+      'robot trí tuệ nhân tạo',
+      'con robot',
+      'robot',
+    ])
+  ) {
+    return 'ai_robot';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'nhận diện khuôn mặt',
+      'mở khóa khuôn mặt',
+      'camera ai',
+      'thị giác máy tính',
+    ])
+  ) {
+    return 'face_recognition';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'trợ lý ảo giọng nói',
+      'nhận diện giọng nói',
+      'ra lệnh bằng giọng nói',
+      'loa thông minh',
+    ])
+  ) {
+    return 'voice_assistant';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'nhà thông minh',
+      'ngôi nhà thông minh',
+      'smart home',
+    ])
+  ) {
+    return 'smart_home_iot';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'xe tự hành',
+      'ô tô tự lái',
+      'xe thông minh',
+    ])
+  ) {
+    return 'self_driving_car';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'câu lệnh prompt',
+      'viết prompt',
+      'trò chuyện với ai',
+      'chatbot ai',
+    ])
+  ) {
+    return 'chatbot_prompt';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'bộ não nhân tạo',
+      'mạng nơ-ron',
+      'học máy',
+      'trí tuệ nhân tạo ai',
+    ])
+  ) {
+    return 'neural_brain';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'mật khẩu mạnh',
+      'đặt mật khẩu',
+      'khóa bảo mật',
+      'mật khẩu an toàn',
+    ])
+  ) {
+    return 'strong_password';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'khiên bảo mật',
+      'diệt virus',
+      'bảo vệ thông tin cá nhân',
+      'an toàn thông tin',
+    ])
+  ) {
+    return 'shield_antivirus';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'lừa đảo trực tuyến',
+      'liên kết lạ',
+      'tin nhắn giả mạo',
+      'cảnh báo nguy hiểm trên mạng',
+    ])
+  ) {
+    return 'phishing_warning';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'lưu trữ đám mây',
+      'đám mây số',
+      'sao lưu dữ liệu',
+    ])
+  ) {
+    return 'cloud_storage';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'máy tìm kiếm',
+      'từ khóa tìm kiếm',
+      'ô tìm kiếm',
+    ])
+  ) {
+    return 'search_engine';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'ứng xử văn minh trên mạng',
+      'công dân số',
+      'giao tiếp văn minh',
+    ])
+  ) {
+    return 'digital_citizenship';
+  }
+  if (
+    hasAnyWholeWord(combined, [
+      'tư thế ngồi máy tính',
+      'ngồi học đúng tư thế',
+      'khoảng cách từ mắt đến màn hình',
+    ])
+  ) {
+    return 'ergonomic_posture';
+  }
+
+  // 3. TIN HỌC: Phần mềm & Biểu tượng ứng dụng (Ưu tiên kiểm tra tên phần mềm cụ thể trước)
   if (
     hasAnyWholeWord(combined, [
       'microsoft word',
@@ -233,7 +698,7 @@ export function detectSemanticTopicKey(rawText: string, fallbackKey?: string): S
     return 'folder_icon';
   }
 
-  // 2. TIN HỌC: Thiết bị & Phần cứng máy tính cụ thể (Kiểm tra bàn di chuột trước chuột máy tính!)
+  // 4. TIN HỌC: Thiết bị & Phần cứng máy tính cụ thể (Kiểm tra bàn di chuột trước chuột máy tính!)
   if (hasAnyWholeWord(combined, ['bàn di chuột', 'tấm lót chuột', 'miếng lót chuột', 'mousepad'])) {
     return 'mousepad';
   }
@@ -291,7 +756,7 @@ export function detectSemanticTopicKey(rawText: string, fallbackKey?: string): S
     return 'hardware_overview';
   }
 
-  // 3. TOÁN HỌC: Hình học phẳng & không gian
+  // 5. TOÁN HỌC: Hình học phẳng & không gian
   if (hasAnyWholeWord(combined, ['tam giác vuông', 'hình tam giác vuông'])) return 'shape_right_triangle';
   if (hasAnyWholeWord(combined, ['tam giác', 'hình tam giác', '3 cạnh'])) return 'shape_triangle';
   if (hasAnyWholeWord(combined, ['khối lập phương', 'hình lập phương'])) return 'shape_cube';
@@ -312,13 +777,13 @@ export function detectSemanticTopicKey(rawText: string, fallbackKey?: string): S
   if (hasAnyWholeWord(combined, ['góc tù'])) return 'angle_obtuse';
   if (hasAnyWholeWord(combined, ['trung điểm', 'điểm ở giữa', 'đoạn thẳng'])) return 'segment_midpoint';
 
-  // 4. TIẾNG VIỆT: Dấu câu
+  // 6. TIẾNG VIỆT: Dấu câu
   if (hasAnyWholeWord(combined, ['dấu chấm hỏi', 'câu hỏi (?)'])) return 'punc_question';
   if (hasAnyWholeWord(combined, ['dấu chấm than', 'dấu cảm', '(!)'])) return 'punc_exclamation';
   if (hasAnyWholeWord(combined, ['dấu phẩy', '(,)'])) return 'punc_comma';
   if (hasAnyWholeWord(combined, ['dấu chấm (.)', 'dấu chấm'])) return 'punc_period';
 
-  // 5. KHOA HỌC: Cơ quan cơ thể
+  // 7. KHOA HỌC: Cơ quan cơ thể
   if (hasAnyWholeWord(combined, ['khoang miệng', 'răng', 'nhai thức ăn'])) return 'organ_mouth_teeth';
   if (hasAnyWholeWord(combined, ['dạ dày', 'bao tử'])) return 'organ_stomach';
   if (hasAnyWholeWord(combined, ['ruột non', 'ruột già', 'đường ruột'])) return 'organ_intestine';
@@ -1304,6 +1769,486 @@ export const CustomTopicSvgRenderer: React.FC<{
           <path d="M80 16 V48 M80 38 L62 52 M80 38 L98 52" stroke="#bae6fd" strokeWidth="5" strokeLinecap="round" />
           <path d="M68 32 C42 32, 30 58, 34 86 C36 98, 64 98, 68 84 Z" fill="#fb7185" stroke="#fecdd3" strokeWidth="3" />
           <path d="M92 32 C118 32, 130 58, 126 86 C124 98, 96 98, 92 84 Z" fill="#fb7185" stroke="#fecdd3" strokeWidth="3" />
+        </svg>
+      );
+
+    // ================= CÔNG NGHỆ: TRỒNG HOA, CÂY CẢNH, DỤNG CỤ LÀM VƯỜN =================
+    case 'flower_pot':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Chậu trồng hoa cây cảnh có vành chậu và lỗ thoát nước ở đáy */}
+          <rect x="38" y="24" width="84" height="14" rx="5" fill="#d97706" stroke="#fde68a" strokeWidth="2.5" />
+          <polygon points="44,38 116,38 104,96 56,96" fill="#b45309" stroke="#fcd34d" strokeWidth="2.5" />
+          {/* Lỗ thoát nước ở đáy chậu */}
+          <ellipse cx="80" cy="90" rx="10" ry="3.5" fill="#0f172a" stroke="#fde047" strokeWidth="1.5" />
+          {/* Đĩa lót dưới đáy chậu */}
+          <rect x="48" y="98" width="64" height="7" rx="3.5" fill="#92400e" stroke="#fbbf24" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'plant_flower':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Chậu hoa đang nở */}
+          <line x1="80" y1="36" x2="80" y2="70" stroke="#22c55e" strokeWidth="5" strokeLinecap="round" />
+          <path d="M80 56 C62 48, 56 36, 72 44" fill="#22c55e" stroke="#86efac" strokeWidth="2" />
+          <path d="M80 54 C98 46, 104 34, 88 42" fill="#22c55e" stroke="#86efac" strokeWidth="2" />
+          {/* Cánh hoa */}
+          <circle cx="80" cy="18" r="9" fill="#f43f5e" />
+          <circle cx="94" cy="28" r="9" fill="#fb7185" />
+          <circle cx="89" cy="43" r="9" fill="#f43f5e" />
+          <circle cx="71" cy="43" r="9" fill="#fb7185" />
+          <circle cx="66" cy="28" r="9" fill="#f43f5e" />
+          <circle cx="80" cy="31" r="8" fill="#facc15" stroke="#fef08a" strokeWidth="2" />
+          {/* Chậu cây */}
+          <rect x="48" y="68" width="64" height="10" rx="3" fill="#d97706" />
+          <polygon points="52,78 108,78 100,108 60,108" fill="#b45309" stroke="#fde68a" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'cactus_succulent':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Cây xương rồng / sen đá trong chậu */}
+          <rect x="68" y="20" width="24" height="52" rx="12" fill="#16a34a" stroke="#86efac" strokeWidth="2.5" />
+          <path d="M68 46 H54 C48 46, 48 30, 54 30 C58 30, 58 38, 58 40" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" />
+          <path d="M92 40 H106 C112 40, 112 26, 106 26 C102 26, 102 34, 102 36" fill="none" stroke="#22c55e" strokeWidth="8" strokeLinecap="round" />
+          <circle cx="80" cy="16" r="6" fill="#f472b6" />
+          <rect x="48" y="70" width="64" height="9" rx="3" fill="#d97706" />
+          <polygon points="52,79 108,79 100,108 60,108" fill="#b45309" stroke="#fcd34d" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'bonsai_tree':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Cây cảnh lá xanh trong chậu */}
+          <path d="M76 72 C76 54, 84 48, 80 34" fill="none" stroke="#92400e" strokeWidth="7" strokeLinecap="round" />
+          <circle cx="64" cy="38" r="16" fill="#15803d" stroke="#86efac" strokeWidth="2" />
+          <circle cx="96" cy="38" r="16" fill="#16a34a" stroke="#86efac" strokeWidth="2" />
+          <circle cx="80" cy="24" r="18" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <rect x="46" y="72" width="68" height="10" rx="3" fill="#0284c7" />
+          <polygon points="50,82 110,82 102,108 58,108" fill="#0369a1" stroke="#7dd3fc" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'soil_substrate':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Giá thể trồng cây: Đất mùn, xơ dừa, trấu hun */}
+          <path d="M22 92 Q80 28 138 92 Z" fill="#78350f" stroke="#d97706" strokeWidth="3" />
+          <circle cx="62" cy="74" r="4" fill="#fbbf24" />
+          <circle cx="84" cy="64" r="3.5" fill="#fde68a" />
+          <circle cx="98" cy="78" r="4" fill="#d97706" />
+          <circle cx="72" cy="84" r="3" fill="#a16207" />
+          {/* Mầm cây nhỏ mọc trên giá thể */}
+          <line x1="80" y1="54" x2="80" y2="32" stroke="#4ade80" strokeWidth="4" strokeLinecap="round" />
+          <ellipse cx="70" cy="32" rx="9" ry="5" fill="#22c55e" />
+          <ellipse cx="90" cy="32" rx="9" ry="5" fill="#4ade80" />
+        </svg>
+      );
+
+    case 'garden_trowel':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Xẻng nhỏ làm vườn xúc đất, giá thể */}
+          <rect x="26" y="50" width="42" height="18" rx="8" fill="#ef4444" stroke="#fca5a5" strokeWidth="2.5" />
+          <line x1="68" y1="59" x2="86" y2="59" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
+          <path d="M84 36 L138 59 L84 82 Z" fill="#cbd5e1" stroke="#f8fafc" strokeWidth="2.5" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'garden_fork':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Chĩa ba làm vườn xới đất */}
+          <rect x="24" y="50" width="42" height="18" rx="8" fill="#f59e0b" stroke="#fde68a" strokeWidth="2.5" />
+          <line x1="66" y1="59" x2="94" y2="59" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
+          <line x1="94" y1="40" x2="94" y2="78" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" />
+          <line x1="94" y1="42" x2="134" y2="42" stroke="#e2e8f0" strokeWidth="5" strokeLinecap="round" />
+          <line x1="94" y1="59" x2="136" y2="59" stroke="#e2e8f0" strokeWidth="5" strokeLinecap="round" />
+          <line x1="94" y1="76" x2="134" y2="76" stroke="#e2e8f0" strokeWidth="5" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'watering_can':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Bình tưới nước vòi hoa sen */}
+          <path d="M48 44 A22 20 0 1 0 48 86" fill="none" stroke="#38bdf8" strokeWidth="6" strokeLinecap="round" />
+          <rect x="46" y="42" width="54" height="50" rx="10" fill="#0284c7" stroke="#7dd3fc" strokeWidth="2.5" />
+          <path d="M100 68 L130 42" stroke="#38bdf8" strokeWidth="8" strokeLinecap="round" />
+          <ellipse cx="132" cy="40" rx="6" ry="10" transform="rotate(-35 132 40)" fill="#facc15" stroke="#fef08a" strokeWidth="2" />
+          {/* Giọt nước phun ra */}
+          <circle cx="144" cy="30" r="3" fill="#7dd3fc" />
+          <circle cx="148" cy="42" r="3" fill="#7dd3fc" />
+          <circle cx="142" cy="52" r="3" fill="#7dd3fc" />
+        </svg>
+      );
+
+    case 'pruning_shears':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Kéo cắt cành làm vườn */}
+          <path d="M34 38 L78 58" stroke="#ef4444" strokeWidth="10" strokeLinecap="round" />
+          <path d="M34 82 L78 62" stroke="#ef4444" strokeWidth="10" strokeLinecap="round" />
+          <path d="M78 58 Q114 38 130 48 Q110 62 78 62 Z" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" />
+          <path d="M78 62 Q114 82 130 72 Q110 58 78 58 Z" fill="#cbd5e1" stroke="#64748b" strokeWidth="2" />
+          <circle cx="80" cy="60" r="5" fill="#facc15" stroke="#0f172a" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'garden_gloves':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Đôi găng tay làm vườn bảo hộ */}
+          <rect x="44" y="42" width="44" height="52" rx="14" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2.5" />
+          <rect x="46" y="18" width="9" height="28" rx="4.5" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <rect x="57" y="14" width="9" height="32" rx="4.5" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <rect x="68" y="16" width="9" height="30" rx="4.5" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <rect x="79" y="22" width="9" height="24" rx="4.5" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <path d="M44 62 L28 50 C24 46, 30 38, 36 44 L46 54" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2.5" />
+          <rect x="42" y="86" width="48" height="14" rx="4" fill="#15803d" stroke="#86efac" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'seed_sprout':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Hạt giống nảy mầm thành cây con */}
+          <path d="M20 88 H140" stroke="#a16207" strokeWidth="8" strokeLinecap="round" />
+          <ellipse cx="48" cy="86" rx="10" ry="7" fill="#fde047" stroke="#ca8a04" strokeWidth="2" />
+          <path d="M80 86 V48" stroke="#22c55e" strokeWidth="5" strokeLinecap="round" />
+          <ellipse cx="70" cy="52" rx="10" ry="6" fill="#4ade80" />
+          <path d="M116 86 V28" stroke="#16a34a" strokeWidth="6" strokeLinecap="round" />
+          <ellipse cx="102" cy="36" rx="13" ry="7" fill="#22c55e" />
+          <ellipse cx="130" cy="32" rx="13" ry="7" fill="#4ade80" />
+        </svg>
+      );
+
+    case 'sunlight_care':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <circle cx="80" cy="60" r="24" fill="#facc15" stroke="#fef08a" strokeWidth="3" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
+            const rad = (deg * Math.PI) / 180;
+            return (
+              <line
+                key={deg}
+                x1={80 + 30 * Math.cos(rad)}
+                y1={60 + 30 * Math.sin(rad)}
+                x2={80 + 44 * Math.cos(rad)}
+                y2={60 + 44 * Math.sin(rad)}
+                stroke="#fde047"
+                strokeWidth="4"
+                strokeLinecap="round"
+              />
+            );
+          })}
+        </svg>
+      );
+
+    case 'fertilizer_bag':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Bao phân bón hữu cơ cho cây */}
+          <rect x="44" y="20" width="72" height="84" rx="12" fill="#15803d" stroke="#86efac" strokeWidth="3" />
+          <circle cx="80" cy="56" r="18" fill="#fef08a" />
+          <path d="M80 44 C72 52, 72 64, 80 68 C88 64, 88 52, 80 44 Z" fill="#16a34a" />
+          <text x="80" y="92" textAnchor="middle" fill="#ffffff" fontSize="13" fontWeight="900">
+            PHÂN BÓN
+          </text>
+        </svg>
+      );
+
+    case 'desk_lamp':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Đèn học để bàn (Công nghệ 3) */}
+          <polygon points="64,22 104,14 114,42 54,42" fill="#f59e0b" stroke="#fde68a" strokeWidth="2.5" />
+          <circle cx="84" cy="44" r="8" fill="#fef08a" />
+          <path d="M72 22 C46 36, 48 76, 66 96" fill="none" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
+          <rect x="44" y="94" width="68" height="12" rx="6" fill="#334155" stroke="#cbd5e1" strokeWidth="2.5" />
+          <circle cx="92" cy="100" r="3" fill="#22c55e" />
+        </svg>
+      );
+
+    case 'electric_fan':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Quạt điện (Công nghệ 3) */}
+          <circle cx="80" cy="46" r="32" fill="#0f172a" stroke="#38bdf8" strokeWidth="3" />
+          <ellipse cx="80" cy="28" rx="8" ry="14" fill="#38bdf8" />
+          <ellipse cx="64" cy="56" rx="14" ry="8" transform="rotate(-30 64 56)" fill="#38bdf8" />
+          <ellipse cx="96" cy="56" rx="14" ry="8" transform="rotate(30 96 56)" fill="#38bdf8" />
+          <circle cx="80" cy="46" r="7" fill="#facc15" />
+          <rect x="74" y="78" width="12" height="20" fill="#64748b" />
+          <rect x="52" y="96" width="56" height="12" rx="6" fill="#334155" stroke="#cbd5e1" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'television_set':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Máy thu hình / Ti vi */}
+          <rect x="20" y="16" width="120" height="72" rx="8" fill="#0f172a" stroke="#38bdf8" strokeWidth="3" />
+          <rect x="26" y="22" width="108" height="60" rx="4" fill="#1e3a8a" />
+          <circle cx="56" cy="44" r="10" fill="#facc15" />
+          <path d="M26 70 L64 50 L96 68 L118 54 L134 68 L134 82 L26 82 Z" fill="#22c55e" opacity="0.75" />
+          <line x1="64" y1="88" x2="52" y2="104" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" />
+          <line x1="96" y1="88" x2="108" y2="104" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'radio_set':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Máy thu thanh / Đài Radio */}
+          <line x1="42" y1="38" x2="112" y2="14" stroke="#cbd5e1" strokeWidth="3.5" strokeLinecap="round" />
+          <circle cx="112" cy="14" r="4" fill="#facc15" />
+          <rect x="28" y="38" width="104" height="64" rx="10" fill="#b45309" stroke="#fde68a" strokeWidth="3" />
+          <circle cx="58" cy="70" r="18" fill="#1e293b" stroke="#fbbf24" strokeWidth="2.5" />
+          <rect x="86" y="50" width="34" height="16" rx="4" fill="#0f172a" stroke="#38bdf8" strokeWidth="2" />
+          <circle cx="94" cy="82" r="6" fill="#fde047" />
+          <circle cx="112" cy="82" r="6" fill="#fde047" />
+        </svg>
+      );
+
+    case 'refrigerator':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Tủ lạnh (Công nghệ 5) */}
+          <rect x="46" y="12" width="68" height="96" rx="8" fill="#0284c7" stroke="#bae6fd" strokeWidth="3" />
+          <line x1="46" y1="48" x2="114" y2="48" stroke="#e0f2fe" strokeWidth="3" />
+          <line x1="56" y1="26" x2="56" y2="40" stroke="#fde047" strokeWidth="4" strokeLinecap="round" />
+          <line x1="56" y1="58" x2="56" y2="82" stroke="#fde047" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'telephone_emergency':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Điện thoại & số khẩn cấp */}
+          <rect x="50" y="12" width="60" height="96" rx="12" fill="#1e293b" stroke="#38bdf8" strokeWidth="3" />
+          <rect x="56" y="22" width="48" height="68" rx="6" fill="#0f172a" />
+          <circle cx="80" cy="48" r="16" fill="#ef4444" />
+          <text x="80" y="53" textAnchor="middle" fill="#ffffff" fontSize="12" fontWeight="900">
+            SOS
+          </text>
+          <circle cx="80" cy="99" r="4" fill="#94a3b8" />
+        </svg>
+      );
+
+    case 'traffic_sign_stop':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Biển báo giao thông */}
+          <rect x="76" y="64" width="8" height="46" fill="#94a3b8" />
+          <circle cx="80" cy="42" r="28" fill="#ef4444" stroke="#ffffff" strokeWidth="4" />
+          <rect x="62" y="37" width="36" height="10" rx="2" fill="#ffffff" />
+        </svg>
+      );
+
+    case 'paper_pinwheel':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Chong chóng giấy dân gian */}
+          <line x1="80" y1="52" x2="80" y2="110" stroke="#fde047" strokeWidth="5" strokeLinecap="round" />
+          <polygon points="80,52 52,20 80,28" fill="#ef4444" />
+          <polygon points="80,52 112,24 104,52" fill="#3b82f6" />
+          <polygon points="80,52 108,84 80,76" fill="#22c55e" />
+          <polygon points="80,52 48,80 56,52" fill="#facc15" />
+          <circle cx="80" cy="52" r="5" fill="#ffffff" />
+        </svg>
+      );
+
+    case 'wrench_screwdriver':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Bộ dụng cụ lắp ghép mô hình kỹ thuật: Cờ-lê và Tua-vít */}
+          <line x1="36" y1="88" x2="114" y2="28" stroke="#94a3b8" strokeWidth="10" strokeLinecap="round" />
+          <circle cx="118" cy="24" r="12" fill="#0f172a" stroke="#cbd5e1" strokeWidth="5" />
+          <line x1="40" y1="26" x2="120" y2="90" stroke="#cbd5e1" strokeWidth="6" strokeLinecap="round" />
+          <rect x="28" y="16" width="30" height="16" rx="6" transform="rotate(38 43 24)" fill="#f59e0b" stroke="#fde68a" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'solar_wind_model':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Mô hình điện mặt trời & điện gió */}
+          <circle cx="40" cy="30" r="14" fill="#facc15" />
+          <polygon points="30,86 78,86 68,60 40,60" fill="#0284c7" stroke="#7dd3fc" strokeWidth="2.5" />
+          <line x1="54" y1="86" x2="54" y2="104" stroke="#94a3b8" strokeWidth="4" />
+          <line x1="114" y1="48" x2="114" y2="104" stroke="#e2e8f0" strokeWidth="4" />
+          <line x1="114" y1="48" x2="114" y2="20" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" />
+          <line x1="114" y1="48" x2="138" y2="64" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" />
+          <line x1="114" y1="48" x2="90" y2="64" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="114" cy="48" r="4" fill="#facc15" />
+        </svg>
+      );
+
+    // ================= KỸ NĂNG SỐ & TRÍ TUỆ NHÂN TẠO (AI) =================
+    case 'strong_password':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <path d="M62 46 V32 A18 18 0 0 1 98 32 V46" fill="none" stroke="#facc15" strokeWidth="6" strokeLinecap="round" />
+          <rect x="46" y="46" width="68" height="54" rx="10" fill="#1e293b" stroke="#facc15" strokeWidth="3" />
+          <text x="80" y="79" textAnchor="middle" fill="#4ade80" fontSize="22" fontWeight="900">
+            ***
+          </text>
+        </svg>
+      );
+
+    case 'shield_antivirus':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <path
+            d="M80 14 L126 30 V58 C126 84, 104 102, 80 110 C56 102, 34 84, 34 58 V30 Z"
+            fill="#0284c7"
+            stroke="#7dd3fc"
+            strokeWidth="3.5"
+          />
+          <polyline points="62,62 75,75 100,46" fill="none" stroke="#fde047" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'phishing_warning':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <polygon points="80,14 136,102 24,102" fill="#dc2626" stroke="#fde047" strokeWidth="4" strokeLinejoin="round" />
+          <text x="80" y="88" textAnchor="middle" fill="#ffffff" fontSize="46" fontWeight="900">
+            !
+          </text>
+        </svg>
+      );
+
+    case 'cloud_storage':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <path
+            d="M46 88 H116 A20 20 0 0 0 120 50 A28 28 0 0 0 66 42 A22 22 0 0 0 46 88 Z"
+            fill="#0284c7"
+            stroke="#bae6fd"
+            strokeWidth="3.5"
+          />
+          <path d="M80 78 V54 M70 64 L80 54 L90 64" fill="none" stroke="#fde047" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+
+    case 'search_engine':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <rect x="18" y="40" width="124" height="40" rx="20" fill="#1e293b" stroke="#38bdf8" strokeWidth="3" />
+          <circle cx="116" cy="58" r="10" fill="none" stroke="#fde047" strokeWidth="3.5" />
+          <line x1="123" y1="65" x2="132" y2="74" stroke="#fde047" strokeWidth="3.5" strokeLinecap="round" />
+          <line x1="36" y1="60" x2="90" y2="60" stroke="#94a3b8" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'digital_citizenship':
+    case 'ergonomic_posture':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          <circle cx="80" cy="36" r="16" fill="#38bdf8" stroke="#bae6fd" strokeWidth="2.5" />
+          <path d="M52 94 C52 70, 108 70, 108 94" fill="#0284c7" stroke="#bae6fd" strokeWidth="2.5" />
+          <circle cx="116" cy="32" r="10" fill="#22c55e" />
+          <polyline points="111,32 115,36 122,28" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'ai_robot':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Robot Trí tuệ nhân tạo AI */}
+          <line x1="80" y1="12" x2="80" y2="26" stroke="#38bdf8" strokeWidth="4" />
+          <circle cx="80" cy="10" r="5" fill="#facc15" />
+          <rect x="44" y="26" width="72" height="56" rx="16" fill="#1e293b" stroke="#38bdf8" strokeWidth="3.5" />
+          <circle cx="64" cy="50" r="8" fill="#38bdf8" />
+          <circle cx="96" cy="50" r="8" fill="#38bdf8" />
+          <rect x="62" y="66" width="36" height="6" rx="3" fill="#4ade80" />
+          <rect x="34" y="42" width="10" height="22" rx="4" fill="#0284c7" />
+          <rect x="116" y="42" width="10" height="22" rx="4" fill="#0284c7" />
+          <rect x="56" y="86" width="48" height="22" rx="8" fill="#0f172a" stroke="#38bdf8" strokeWidth="2.5" />
+        </svg>
+      );
+
+    case 'neural_brain':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Mạng nơ-ron & Trí tuệ nhân tạo */}
+          <circle cx="44" cy="36" r="8" fill="#a855f7" stroke="#e9d5ff" strokeWidth="2" />
+          <circle cx="44" cy="84" r="8" fill="#a855f7" stroke="#e9d5ff" strokeWidth="2" />
+          <circle cx="80" cy="24" r="9" fill="#38bdf8" stroke="#bae6fd" strokeWidth="2" />
+          <circle cx="80" cy="60" r="10" fill="#facc15" stroke="#fef08a" strokeWidth="2" />
+          <circle cx="80" cy="96" r="9" fill="#38bdf8" stroke="#bae6fd" strokeWidth="2" />
+          <circle cx="116" cy="44" r="8" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <circle cx="116" cy="78" r="8" fill="#22c55e" stroke="#bbf7d0" strokeWidth="2" />
+          <line x1="52" y1="36" x2="72" y2="26" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="52" y1="36" x2="70" y2="58" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="52" y1="84" x2="70" y2="62" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="52" y1="84" x2="72" y2="94" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="89" y1="26" x2="108" y2="42" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="90" y1="60" x2="108" y2="46" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="90" y1="60" x2="108" y2="76" stroke="#94a3b8" strokeWidth="2" />
+          <line x1="89" y1="94" x2="108" y2="80" stroke="#94a3b8" strokeWidth="2" />
+        </svg>
+      );
+
+    case 'face_recognition':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Nhận diện khuôn mặt bằng AI */}
+          <path d="M36 36 V22 H52 M124 36 V22 H108 M36 84 V98 H52 M124 84 V98 H108" fill="none" stroke="#38bdf8" strokeWidth="4" strokeLinecap="round" />
+          <circle cx="80" cy="60" r="26" fill="#1e293b" stroke="#4ade80" strokeWidth="3" />
+          <circle cx="71" cy="54" r="3.5" fill="#38bdf8" />
+          <circle cx="89" cy="54" r="3.5" fill="#38bdf8" />
+          <path d="M70 68 Q80 76 90 68" fill="none" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'voice_assistant':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Trợ lý ảo giọng nói */}
+          <rect x="68" y="20" width="24" height="44" rx="12" fill="#38bdf8" stroke="#bae6fd" strokeWidth="2.5" />
+          <path d="M54 46 A26 26 0 0 0 106 46" fill="none" stroke="#facc15" strokeWidth="4" strokeLinecap="round" />
+          <line x1="80" y1="72" x2="80" y2="96" stroke="#facc15" strokeWidth="4" strokeLinecap="round" />
+          <line x1="62" y1="96" x2="98" y2="96" stroke="#facc15" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'smart_home_iot':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Ngôi nhà thông minh AI */}
+          <polygon points="80,18 130,56 30,56" fill="#0284c7" stroke="#7dd3fc" strokeWidth="3" strokeLinejoin="round" />
+          <rect x="44" y="56" width="72" height="48" rx="4" fill="#1e293b" stroke="#38bdf8" strokeWidth="3" />
+          <rect x="70" y="72" width="20" height="32" rx="3" fill="#facc15" />
+        </svg>
+      );
+
+    case 'self_driving_car':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Xe tự hành AI */}
+          <path d="M36 70 L50 44 H110 L124 70 Z" fill="#0284c7" stroke="#bae6fd" strokeWidth="2.5" />
+          <rect x="24" y="68" width="112" height="24" rx="8" fill="#1e293b" stroke="#38bdf8" strokeWidth="2.5" />
+          <circle cx="48" cy="92" r="12" fill="#0f172a" stroke="#cbd5e1" strokeWidth="3" />
+          <circle cx="112" cy="92" r="12" fill="#0f172a" stroke="#cbd5e1" strokeWidth="3" />
+          <path d="M80 34 A18 12 0 0 1 104 34" fill="none" stroke="#4ade80" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+      );
+
+    case 'chatbot_prompt':
+      return (
+        <svg viewBox="0 0 160 120" className={className}>
+          {/* Giao tiếp câu lệnh Prompt với AI */}
+          <rect x="26" y="24" width="108" height="64" rx="14" fill="#1e293b" stroke="#a855f7" strokeWidth="3" />
+          <polygon points="56,88 44,104 74,88" fill="#1e293b" stroke="#a855f7" strokeWidth="3" />
+          <text x="80" y="64" textAnchor="middle" fill="#e9d5ff" fontSize="22" fontWeight="900">
+            AI ✨
+          </text>
         </svg>
       );
   }
