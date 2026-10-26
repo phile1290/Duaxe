@@ -62,6 +62,29 @@ class SoundSynthesizer {
     }
   }
 
+  // Tiếng bật nhảy / click vui nhộn khi Bà cụ nhảy bắt gà
+  public playClick(): void {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(340, now);
+      osc.frequency.exponentialRampToValueAtTime(680, now + 0.1);
+
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.005, now + 0.11);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } catch (e) {}
+  }
+
   // Tiếng trả lời đúng (Chuông ngân vui tươi C - E - G - C5)
   public playCorrect(): void {
     const ctx = this.getContext();

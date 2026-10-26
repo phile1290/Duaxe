@@ -6,7 +6,7 @@ import {
   getUniformOptionVisuals,
   resolveVisualDisplayMode,
 } from './QuestionVisualIllustration';
-import { Timer, Flame, UserCheck, Clock, CheckCircle2, Shuffle } from 'lucide-react';
+import { Timer, Flame, UserCheck, Clock, Shuffle } from 'lucide-react';
 
 interface QuestionHUDProps {
   question: Question;
@@ -31,9 +31,10 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   onAnswer,
   combo,
 }) => {
-  const [timeLeft, setTimeLeft] = useState(30);
+  // Thời gian 1 câu hỏi là 1 phút (60 giây) để học sinh thoải mái đọc kỹ câu hỏi và 4 đáp án
+  const totalTime = 60;
+  const [timeLeft, setTimeLeft] = useState(totalTime);
   const [elapsedSec, setElapsedSec] = useState(0);
-  const totalTime = 30;
   const answeredRef = React.useRef(false);
   const startTimeRef = React.useRef<number>(Date.now());
   const onAnswerRef = React.useRef(onAnswer);
@@ -90,10 +91,30 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   }, []);
 
   const optionColors = [
-    { bg: 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700', border: 'border-rose-400', badge: 'bg-rose-900', label: 'A' },
-    { bg: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700', border: 'border-blue-400', badge: 'bg-blue-900', label: 'B' },
-    { bg: 'bg-amber-600 hover:bg-amber-500 active:bg-amber-700', border: 'border-amber-400', badge: 'bg-amber-900', label: 'C' },
-    { bg: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700', border: 'border-emerald-400', badge: 'bg-emerald-900', label: 'D' },
+    {
+      bg: 'bg-rose-600 hover:bg-rose-500 active:bg-rose-700',
+      border: 'border-rose-400',
+      badge: 'bg-rose-900',
+      label: 'A',
+    },
+    {
+      bg: 'bg-blue-600 hover:bg-blue-500 active:bg-blue-700',
+      border: 'border-blue-400',
+      badge: 'bg-blue-900',
+      label: 'B',
+    },
+    {
+      bg: 'bg-amber-600 hover:bg-amber-500 active:bg-amber-700',
+      border: 'border-amber-400',
+      badge: 'bg-amber-900',
+      label: 'C',
+    },
+    {
+      bg: 'bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700',
+      border: 'border-emerald-400',
+      badge: 'bg-emerald-900',
+      label: 'D',
+    },
   ];
 
   const timePercent = (timeLeft / totalTime) * 100;
@@ -102,143 +123,160 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   const currentTotalSec = activeRacer?.totalTimeSec ?? 0;
   const visualMode = resolveVisualDisplayMode(question);
   const showQuestionImage = visualMode === 'question_image';
-  const uniformOptionVisuals = visualMode === 'options_image' ? getUniformOptionVisuals(question) : null;
+  const uniformOptionVisuals =
+    visualMode === 'options_image' ? getUniformOptionVisuals(question) : null;
 
   return (
-    <div className="w-full bg-slate-900/95 border-b-2 border-amber-400/80 shadow-2xl backdrop-blur-md px-2.5 py-2 sm:px-4 sm:py-2.5 select-none flex flex-col justify-between">
-      {/* 1. Header Bar: Active Climber Turn + Selected Student + Correct Count & Seconds + Timer */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-slate-800">
-        {/* Left: Active Team/Student & Caught Chick Student */}
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="w-full h-full bg-slate-900/95 border-2 border-amber-400/85 rounded-2xl shadow-2xl backdrop-blur-md p-3 sm:p-4 select-none flex flex-col justify-between overflow-y-auto gap-2.5">
+      {/* 1. Top Status & 1-Minute Timer Header */}
+      <div className="space-y-2 shrink-0">
+        <div className="flex flex-wrap items-center justify-between gap-1.5 pb-1.5 border-b border-slate-800">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="bg-indigo-950 border border-indigo-500/60 text-indigo-200 px-2.5 py-1 rounded-lg text-xs sm:text-sm font-black">
+              Câu {questionNumber}/{totalQuestions}
+            </span>
+
+            {/* Đồng hồ bấm giây tính tốc độ trả lời để phân định thắng thua khi ngang điểm */}
+            <div
+              title="Số giây trả lời câu hỏi này (dùng để phân định người thắng cuộc khi ngang điểm)"
+              className="bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-500/60 flex items-center gap-1 text-xs"
+            >
+              <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span className="font-mono font-black text-emerald-300">
+                {elapsedSec.toFixed(1)}s
+              </span>
+            </div>
+
+            <div className="bg-slate-800/90 px-2 py-1 rounded-lg border border-slate-700 flex items-center gap-1 text-xs">
+              <Flame
+                className={`w-3.5 h-3.5 ${
+                  combo >= 2 ? 'text-orange-400 animate-bounce' : 'text-slate-400'
+                }`}
+              />
+              <span className="font-mono font-black text-amber-300">{combo}/3</span>
+            </div>
+          </div>
+
+          {/* 60-Second (1 Minute) Countdown Timer */}
+          <div
+            title="Thời gian suy nghĩ và đọc đáp án: 1 phút (60 giây)"
+            className="bg-slate-800/95 px-2.5 py-1 rounded-lg border border-amber-400/50 flex items-center gap-1.5"
+          >
+            <Timer
+              className={`w-4 h-4 ${
+                timeLeft <= 10 ? 'text-rose-400 animate-spin' : 'text-amber-400'
+              }`}
+            />
+            <span
+              className={`font-mono text-xs sm:text-sm font-black ${
+                timeLeft <= 10 ? 'text-rose-400 animate-pulse' : 'text-amber-300'
+              }`}
+            >
+              {timeLeft}s / 60s
+            </span>
+          </div>
+        </div>
+
+        {/* Timer Progress Bar */}
+        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+          <div
+            className={`h-full transition-all duration-1000 ease-linear rounded-full ${
+              timeLeft <= 10
+                ? 'bg-rose-500'
+                : 'bg-gradient-to-r from-amber-400 via-orange-400 to-emerald-400'
+            }`}
+            style={{ width: `${timePercent}%` }}
+          />
+        </div>
+
+        {/* Active Student / Team Turn Status Banner */}
+        <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl p-2">
           <div
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shrink-0 shadow font-black text-slate-950 ring-1 ring-white/20"
             style={{ backgroundColor: activeRacer?.colorHex || '#f59e0b' }}
           >
             {activeRacer?.avatar || '🦁'}
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider leading-none">
-                Lượt trả lời ngẫu nhiên:
-              </span>
-              {lessonTitle && (
-                <span className="text-[10px] font-black text-emerald-300 bg-emerald-950/90 border border-emerald-500/40 px-1.5 py-0.2 rounded uppercase truncate max-w-[180px] sm:max-w-xs">
-                  {lessonTitle.toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div className="text-xs sm:text-sm font-extrabold text-white truncate flex items-center gap-1.5 flex-wrap">
-              <span>{activeRacer?.name}</span>
-              <span className="text-[10px] sm:text-xs text-amber-300 font-mono font-bold">
-                (Móc {currentHook}/10 • {activeRacer?.score || 0}đ • ✅ {currentCorrect} đúng • ⏱️{' '}
-                {currentTotalSec.toFixed(1)}s)
-              </span>
-              {selectedStudentName && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black">
-                  <UserCheck className="w-3 h-3" />
+          <div className="min-w-0 flex-1">
+            {lessonTitle && (
+              <div className="text-[10px] font-black text-emerald-300 uppercase truncate">
+                {lessonTitle.toUpperCase()}
+              </div>
+            )}
+            {selectedStudentName ? (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
+                  <UserCheck className="w-3.5 h-3.5" />
                   <span>🐥 {selectedStudentName}</span>
                 </span>
-              )}
-              {studentCallCount > 1 && (
-                <span
-                  title="Bà già chống gậy bắt ngẫu nhiên nên một học sinh có thể được gọi nhiều lần trong cuộc chơi"
-                  className="inline-flex items-center gap-1 px-2 py-0.2 rounded-full bg-indigo-600/90 border border-indigo-300 text-white text-[10px] font-black"
-                >
-                  <Shuffle className="w-2.5 h-2.5" />
-                  <span>Ngẫu nhiên lần {studentCallCount}</span>
+                <span className="text-xs font-extrabold text-white truncate">
+                  ({activeRacer?.name} • Móc {currentHook}/10 • {activeRacer?.score || 0}đ • ✅{' '}
+                  {currentCorrect} • ⏱️ {currentTotalSec.toFixed(1)}s)
                 </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Question Counter, Live Stopwatch (Số Giây), Combo & Countdown Timer */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <span className="bg-indigo-950 border border-indigo-500/50 text-indigo-200 px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black">
-            Câu {questionNumber}/{totalQuestions}
-          </span>
-
-          {/* Đồng hồ bấm giây tính tốc độ trả lời để phân định thắng thua khi ngang điểm */}
-          <div
-            title="Số giây trả lời câu hỏi này (dùng để phân định người thắng cuộc khi ngang điểm)"
-            className="bg-emerald-950/90 px-2 py-0.5 rounded-lg border border-emerald-500/60 flex items-center gap-1 text-[11px]"
-          >
-            <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="font-mono font-black text-emerald-300">
-              {elapsedSec.toFixed(1)} giây
-            </span>
-          </div>
-
-          <div className="bg-slate-800/90 px-2 py-0.5 rounded-lg border border-slate-700 flex items-center gap-1 text-[11px]">
-            <Flame className={`w-3.5 h-3.5 ${combo >= 2 ? 'text-orange-400 animate-bounce' : 'text-slate-400'}`} />
-            <span className="font-mono font-black text-amber-300">{combo}/3</span>
-          </div>
-
-          <div className="bg-slate-800/90 px-2 sm:px-2.5 py-0.5 rounded-lg border border-slate-700 flex items-center gap-1">
-            <Timer className={`w-3.5 h-3.5 ${timeLeft <= 5 ? 'text-rose-400 animate-spin' : 'text-amber-400'}`} />
-            <span className={`font-mono text-xs sm:text-sm font-black ${timeLeft <= 5 ? 'text-rose-400 animate-pulse' : 'text-amber-300'}`}>
-              {timeLeft}s
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Timer Progress Bar */}
-      <div className="w-full bg-slate-800 h-1 rounded-full my-1 overflow-hidden">
-        <div
-          className={`h-full transition-all duration-1000 ease-linear rounded-full ${
-            timeLeft <= 5 ? 'bg-rose-500' : 'bg-gradient-to-r from-amber-400 to-orange-500'
-          }`}
-          style={{ width: `${timePercent}%` }}
-        />
-      </div>
-
-      {/* 2. Question Area:
-          - Khi câu hỏi có hình ảnh (showQuestionImage): Hiển thị văn bản câu hỏi + hình ảnh câu hỏi bên cạnh (và đáp án sẽ là văn bản thuần).
-          - Khi đáp án là các hình ảnh (options_image) hoặc câu hỏi thuần chữ: Câu hỏi CHỈ hiển thị văn bản toàn chiều ngang. */}
-      <div className="my-1 grid grid-cols-1 lg:grid-cols-12 gap-2 items-center">
-        <div
-          className={`${
-            showQuestionImage ? 'lg:col-span-8' : 'lg:col-span-12'
-          } flex flex-col gap-1 bg-slate-950/70 border ${
-            question.isAdvanced || question.difficulty === 'nang_cao'
-              ? 'border-purple-400/80 shadow-[0_0_15px_rgba(168,85,247,0.25)]'
-              : 'border-slate-800'
-          } rounded-xl p-2 sm:p-2.5`}
-        >
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] sm:text-xs bg-amber-400 text-slate-950 font-black px-2 py-0.5 rounded-md shrink-0">
-              CÂU {questionNumber}
-            </span>
-            {(question.isAdvanced || question.difficulty === 'nang_cao') && (
-              <span className="text-[10px] sm:text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black px-2 py-0.5 rounded-md shrink-0 shadow">
-                🌟 CÂU HỎI NÂNG CAO
-              </span>
+                {studentCallCount > 1 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-600/90 border border-indigo-300 text-white text-[10px] font-black">
+                    <Shuffle className="w-2.5 h-2.5" />
+                    <span>Lần {studentCallCount}</span>
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs font-bold text-amber-300 leading-snug">
+                👵 Chưa gọi tên học sinh — Hãy bấm{' '}
+                <span className="underline font-black">"Bắt đầu bắt gà gọi tên"</span> ở khung bên
+                phải!
+              </div>
             )}
           </div>
-          <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-white leading-snug">
-            {question.question}
-          </h2>
+        </div>
+      </div>
+
+      {/* 2. Question Content Area (Cỡ chữ lớn, rõ ràng) */}
+      <div
+        className={`flex flex-col gap-2 bg-slate-950/85 border-2 ${
+          question.isAdvanced || question.difficulty === 'nang_cao'
+            ? 'border-purple-400/85 shadow-[0_0_18px_rgba(168,85,247,0.3)]'
+            : 'border-slate-800'
+        } rounded-2xl p-3 sm:p-3.5 shrink-0`}
+      >
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-xs sm:text-sm bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-lg shrink-0">
+            CÂU HỎI {questionNumber}
+          </span>
+          {(question.isAdvanced || question.difficulty === 'nang_cao') && (
+            <span className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black px-2.5 py-0.5 rounded-lg shrink-0 shadow">
+              🌟 CÂU HỎI NÂNG CAO
+            </span>
+          )}
         </div>
 
+        <h2 className="text-base sm:text-lg xl:text-xl font-black text-white leading-snug break-words">
+          {question.question}
+        </h2>
+
         {showQuestionImage && (
-          <div className="lg:col-span-4">
+          <div className="pt-1">
             <QuestionVisualIllustration question={question} index={questionNumber} compact />
           </div>
         )}
       </div>
 
-      {/* 3. 4 Answer Options (A, B, C, D):
-          - Khi câu hỏi hiển thị hình ảnh -> Đáp án chỉ là VĂN BẢN.
-          - Khi đáp án là các hình ảnh -> Cả 4 đáp án đều có hình ảnh đồng nhất và câu hỏi là VĂN BẢN. */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 pt-0.5">
+      {/* 3. Các Đáp Án A, B, C, D Đặt Dọc Từ Trên Xuống Ở Cột Trái 1/3:
+          - Tăng cỡ chữ nội dung đáp án (text-sm sm:text-base xl:text-lg)
+          - Không cắt chữ (không dùng line-clamp), hiển thị đầy đủ các đáp án dài từ trên xuống dưới */}
+      <div
+        className={`flex-1 flex flex-col justify-between ${
+          uniformOptionVisuals ? 'grid grid-cols-2 gap-2' : 'gap-2 sm:gap-2.5'
+        }`}
+      >
         {question.options.map((opt, idx) => {
           const col = optionColors[idx];
           return (
             <button
               key={idx}
+              type="button"
               onClick={() => handleSelectAnswer(idx)}
-              className={`group flex flex-col justify-between gap-1.5 p-2 sm:p-2.5 rounded-xl ${col.bg} border-2 ${col.border} text-white font-bold text-left transition-all active:scale-95 shadow-md cursor-pointer`}
+              className={`group w-full flex flex-col justify-center gap-1.5 p-2.5 sm:p-3.5 rounded-2xl ${col.bg} border-2 ${col.border} text-white font-bold text-left transition-all active:scale-[0.98] shadow-lg cursor-pointer`}
             >
               {uniformOptionVisuals && (
                 <OptionVisualIllustration
@@ -251,13 +289,13 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
                 />
               )}
 
-              <div className="flex items-center gap-2 w-full">
+              <div className="flex items-start gap-2.5 w-full">
                 <span
-                  className={`w-5 h-5 sm:w-6 sm:h-6 rounded-lg ${col.badge} flex items-center justify-center text-[11px] sm:text-xs font-black shrink-0 shadow`}
+                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${col.badge} flex items-center justify-center text-sm sm:text-base font-black shrink-0 shadow border border-white/20 mt-0.5`}
                 >
                   {col.label}
                 </span>
-                <span className="text-xs sm:text-sm md:text-base flex-1 font-extrabold leading-tight line-clamp-2">
+                <span className="text-sm sm:text-base xl:text-lg flex-1 font-extrabold leading-snug break-words">
                   {opt}
                 </span>
               </div>

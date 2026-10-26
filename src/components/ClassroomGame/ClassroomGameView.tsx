@@ -286,10 +286,14 @@ export const ClassroomGameView: React.FC = () => {
         </div>
       </header>
 
-      {/* 2. MAIN WORKSPACE: TOP QUESTION HUD (WITH PURE LARGE VISUALS) + BOTTOM DUAL-SCREEN ARENA */}
-      <div className="flex-1 w-full h-full flex flex-col overflow-hidden relative">
-        {/* TOP: VÙNG CÂU HỎI TRẮC NGHIỆM KÈM HÌNH ẢNH TO RÕ RÀNG */}
-        <div className="shrink-0 z-20 w-full">
+      {/* 2. BỐ CỤC GIAO DIỆN KHOA HỌC MỚI:
+          - Phía bên TRÁI 1/3 TỪ TRÊN XUỐNG: Câu hỏi và CÁC ĐÁP ÁN xếp dọc từ trên xuống với cỡ chữ lớn, rõ ràng, không bị che đáp án dài.
+          - Phía bên PHẢI 2/3 chia làm 2 tầng:
+            + Phía TRÊN: Khu vực Bà cụ chống gậy (không cầm gì ngoài cây gậy), các chú gà di chuyển chậm rãi, bà lão nhảy tới bắt có thể trúng hay trật chú gà, không gọi tên trước khi bấm bắt đầu bắt gà gọi tên.
+            + Phía DƯỚI: Khu vực các MÓC cuộc chơi (Rừng Cổ Thụ & Thú Hoang Leo Dây Thừng 10 Móc). */}
+      <div className="flex-1 w-full h-full flex flex-col lg:flex-row gap-2.5 p-2 overflow-y-auto lg:overflow-hidden relative min-h-0 bg-slate-950">
+        {/* CỘT BÊN TRÁI 1/3 TỪ TRÊN XUỐNG: CÂU HỎI & CÁC ĐÁP ÁN (A, B, C, D) */}
+        <div className="w-full lg:w-[35%] xl:w-[34%] lg:h-full shrink-0 flex flex-col min-h-[400px] lg:min-h-0 z-20">
           {currentQuestion && gameState === 'question' ? (
             <QuestionHUD
               question={currentQuestion}
@@ -307,17 +311,20 @@ export const ClassroomGameView: React.FC = () => {
               combo={activeRacer?.combo || 0}
             />
           ) : (
-            <div className="bg-slate-900/90 border-b border-slate-800 px-3 py-1.5 sm:px-4 sm:py-2 flex items-center justify-between text-xs text-slate-300">
-              <div className="flex items-center gap-2">
-                <Flag className="w-4 h-4 text-amber-400" />
-                <span className="font-black text-amber-300 uppercase">{displayLessonTitle}</span>
-                <span className="hidden sm:inline">
-                  • Bấm "Cài Đặt Bài & Đội" để chọn bài học hoặc tải file PDF
-                </span>
+            <div className="w-full h-full bg-slate-900/95 border-2 border-amber-400/75 rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-3 shadow-2xl">
+              <Flag className="w-10 h-10 text-amber-400" />
+              <div className="text-xs font-black text-amber-300 uppercase tracking-wider">
+                Cột Trái 1/3 Từ Trên Xuống • Câu Hỏi & Các Đáp Án
               </div>
+              <div className="font-black text-base sm:text-lg text-white uppercase">
+                {displayLessonTitle}
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                Nội dung câu hỏi và 4 đáp án A, B, C, D sẽ hiển thị dọc từ trên xuống tại đây với cỡ chữ lớn và thời gian 1 phút (60 giây) mỗi câu.
+              </p>
               <button
                 onClick={startRace}
-                className="py-1 px-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-lg cursor-pointer shadow text-xs"
+                className="py-2.5 px-5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl cursor-pointer shadow-lg text-xs sm:text-sm"
               >
                 BẮT ĐẦU CHƠI
               </button>
@@ -325,78 +332,75 @@ export const ClassroomGameView: React.FC = () => {
           )}
         </div>
 
-        {/* BOTTOM DUAL-SCREEN LAYOUT:
-            - Màn hình nhỏ bên trái: Bà Già Chống Gậy chạy quanh sân bắt các chú gà con di chuyển lung tung (lượt ngẫu nhiên)
-            - Màn hình lớn bên phải: Rừng Cổ Thụ & Thú Hoang Leo Dây Thừng 10 Móc (đúng leo lên 1 móc, sai tụt xuống 1 móc)
-        */}
-        <div className="flex-1 w-full h-full flex flex-col md:flex-row overflow-hidden relative min-h-0">
-          {/* MÀN HÌNH NHỎ BÊN TRÁI: BÀ GIÀ CHỐNG GẬY BẮT GÀ CON */}
-          <div className="w-full md:w-[37%] lg:w-[35%] h-[42%] md:h-full shrink-0 overflow-hidden">
+        {/* CỘT BÊN PHẢI 2/3: PHÍA TRÊN LÀ BÀ CỤ CHỐNG GẬY BẮT GÀ GỌI TÊN • PHÍA DƯỚI LÀ CÁC MÓC CUỘC CHƠI */}
+        <div className="w-full lg:w-[65%] xl:w-[66%] lg:h-full flex-1 flex flex-col gap-2.5 min-w-0 min-h-0 overflow-hidden">
+          {/* PHÍA TRÊN: BÀ CỤ CHỐNG GẬY BẮT GÀ GỌI TÊN HỌC SINH */}
+          <div className="w-full h-[250px] sm:h-[270px] lg:h-[45%] shrink-0 overflow-hidden">
             <ChickPickerArena
               gameMode={gameMode}
               racers={racers}
               students={students}
-              activeRacerIndex={currentRacerIndex}
+              currentRacerIndex={currentRacerIndex}
               selectedStudentName={selectedStudentName}
               studentCallCounts={studentCallCounts}
-              sessionStudentRecords={sessionStudentRecords}
               onSelectStudent={(studentName, racerIdx) =>
                 selectStudentToAnswer(studentName, racerIdx)
               }
-              onChangeActiveTeam={(racerIdx) => setCurrentRacerIndex(racerIdx)}
+              onSelectTeamFilter={(racerIdx) => setCurrentRacerIndex(racerIdx)}
             />
           </div>
 
-          {/* MÀN HÌNH LỚN BÊN PHẢI: RỪNG CỔ THỤ VỚI DÂY THỪNG 10 MÓC & THÚ HOANG */}
-          <div className="flex-1 h-[58%] md:h-full min-w-0 overflow-hidden">
+          {/* PHÍA DƯỚI: KHU VỰC CÁC MÓC CUỘC CHƠI (RỪNG CỔ THỤ 10 MÓC DÂY THỪNG & THÚ HOANG) */}
+          <div className="w-full flex-1 min-h-[240px] lg:min-h-0 overflow-hidden rounded-2xl border-2 border-emerald-500/50 shadow-xl">
             <AncientForestRopeClimb
               racers={racers}
               activeRacerIndex={currentRacerIndex}
               selectedStudentName={selectedStudentName}
             />
           </div>
+        </div>
 
-          {/* Idle Welcome Overlay before game starts */}
-          {gameState === 'idle' && (
-            <div className="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3">
-              <div className="bg-slate-900/95 border-2 border-amber-400 rounded-3xl p-5 sm:p-7 max-w-lg text-center text-white shadow-2xl animate-in zoom-in-95 duration-200">
-                <div className="text-3xl mb-1">👵🦯🐥 🌳🦁🧗</div>
-                <div className="text-xs font-black text-amber-400 uppercase tracking-wider mb-1">
-                  {displayLessonTitle}
-                </div>
-                <h3 className="text-lg sm:text-xl font-black mb-1.5 text-white">
-                  BÀ GIÀ CHỐNG GẬY BẮT GÀ & RỪNG CỔ THỤ 10 MÓC!
-                </h3>
-                <p className="text-slate-300 text-xs mb-4 leading-relaxed">
-                  • <strong>Màn hình trái:</strong> Bà già chống gậy chạy xung quanh bắt các chú gà con đang di chuyển lung tung (Lượt chơi ngẫu nhiên: trúng học sinh của đội nào thì tính điểm/trừ điểm cho đội đó hoặc cá nhân đó).
-                  <br />• <strong>Màn hình phải:</strong> Rừng cổ thụ với dây thừng 10 móc và thú hoang của{' '}
-                  <strong className="text-amber-400">
-                    {gameMode === 'individual' ? `${racers.length} cá nhân` : `${racers.length} đội nhóm`}
-                  </strong>
-                  . Trả lời đúng leo lên +1 móc, trả lời sai tụt xuống -1 móc!
-                </p>
+        {/* Idle Welcome Overlay before game starts */}
+        {gameState === 'idle' && (
+          <div className="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3">
+            <div className="bg-slate-900/95 border-2 border-amber-400 rounded-3xl p-5 sm:p-7 max-w-lg text-center text-white shadow-2xl animate-in zoom-in-95 duration-200">
+              <div className="text-3xl mb-1">👵🦯🐥 🌳🦁🧗</div>
+              <div className="text-xs font-black text-amber-400 uppercase tracking-wider mb-1">
+                {displayLessonTitle}
+              </div>
+              <h3 className="text-lg sm:text-xl font-black mb-1.5 text-white">
+                BÀ CỤ CHỐNG GẬY BẮT GÀ & RỪNG CỔ THỤ 10 MÓC!
+              </h3>
+              <p className="text-slate-300 text-xs mb-4 leading-relaxed text-left">
+                • <strong>Bên trái 1/3 từ trên xuống:</strong> Nội dung câu hỏi và 4 đáp án A, B, C, D với cỡ chữ lớn, rõ ràng và thời gian suy nghĩ <strong>1 phút (60 giây)</strong> mỗi câu.
+                <br />• <strong>Bên phải phía trên:</strong> Bà cụ chống gậy (chỉ cầm cây gậy) nhảy tới bắt các chú gà con di chuyển chậm rãi (có thể bắt trúng hoặc trật chú gà, chỉ gọi tên sau khi bấm bắt đầu bắt gà).
+                <br />• <strong>Bên phải phía dưới:</strong> Khu vực các MÓC cuộc chơi của{' '}
+                <strong className="text-amber-400">
+                  {gameMode === 'individual' ? `${racers.length} cá nhân` : `${racers.length} đội nhóm`}
+                </strong>
+                . Trả lời đúng leo lên +1 móc, trả lời sai tụt xuống -1 móc!
+              </p>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <button
-                    onClick={startRace}
-                    className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 cursor-pointer"
-                  >
-                    <Play className="w-4 h-4 fill-slate-950" />
-                    <span>BẮT ĐẦU TRÒ CHƠI NGAY</span>
-                  </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={startRace}
+                  className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 cursor-pointer"
+                >
+                  <Play className="w-4 h-4 fill-slate-950" />
+                  <span>BẮT ĐẦU TRÒ CHƠI NGAY</span>
+                </button>
 
-                  <button
-                    onClick={openSetup}
-                    className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Cài Đặt Bài & Đội</span>
-                  </button>
-                </div>
+                <button
+                  onClick={openSetup}
+                  className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Cài Đặt Bài & Đội</span>
+                </button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Feedback Modal (Result of turn: +1 hook or -1 hook + response time in seconds) */}
         {gameState === 'feedback' && lastFeedback && (

@@ -136,6 +136,10 @@ export const RaceSetupModal: React.FC<RaceSetupModalProps> = ({
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [apiErrorBanner, setApiErrorBanner] = useState<{
+    isQuotaError: boolean;
+    message: string;
+  } | null>(null);
 
   // Settings Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
@@ -874,6 +878,33 @@ export const RaceSetupModal: React.FC<RaceSetupModalProps> = ({
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>{toastMessage.text}</span>
+            </div>
+          )}
+
+          {/* Prominent Gemini API Key Quota / Error Banner (Yêu cầu thay đổi API KEY GEMINI khi hết Quota) */}
+          {apiErrorBanner && (
+            <div className="my-2 bg-rose-950/95 border-2 border-rose-400 p-3 rounded-2xl text-xs text-rose-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shrink-0 shadow-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-black text-rose-300 uppercase">
+                    {apiErrorBanner.isQuotaError
+                      ? '⚠️ CẢNH BÁO HẾT HẠN MỨC (QUOTA) GEMINI API KEY'
+                      : '🔑 YÊU CẦU KIỂM TRA / THAY ĐỔI GEMINI API KEY'}
+                  </div>
+                  <p className="font-semibold text-rose-100 leading-snug">
+                    {apiErrorBanner.message}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shrink-0 shadow cursor-pointer"
+              >
+                <Settings className="w-4 h-4" />
+                <span>Thay Đổi API KEY GEMINI</span>
+              </button>
             </div>
           )}
 

@@ -33,6 +33,7 @@ export const AiQuizGenerator: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isErrorStatus, setIsErrorStatus] = useState<boolean>(false);
 
   // Handle PDF file selection
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,12 +53,16 @@ export const AiQuizGenerator: React.FC = () => {
   // Call Gemini API via stable gemini-2.5-flash model
   const handleGenerate = async () => {
     if (!lessonTitle.trim()) {
+      setIsErrorStatus(true);
       setStatusMessage('Vui lòng nhập tên bài học hoặc số bài (ví dụ: Bài 3) trước khi tạo câu hỏi!');
       return;
     }
 
     setIsLoading(true);
     setStatusMessage(null);
+    setIsErrorStatus(false);
+
+    const previousQuestionTexts = generatedQuestions.map((q) => q.question);
 
     try {
       const result = await extractQuizWithGemini({
@@ -67,6 +72,7 @@ export const AiQuizGenerator: React.FC = () => {
         questionCount,
         content: rawText,
         pdfBase64,
+        excludeQuestions: previousQuestionTexts,
       });
 
       if (result.success && result.questions && result.questions.length > 0) {
@@ -78,21 +84,26 @@ export const AiQuizGenerator: React.FC = () => {
           .trim()
           .toUpperCase();
         setLessonTitle(resolvedUpperTitle);
-        setGeneratedQuestions(normalizeQuestionVisuals(result.questions));
+        setGeneratedQuestions(
+          normalizeQuestionVisuals(result.questions, previousQuestionTexts)
+        );
+        setIsErrorStatus(false);
         setStatusMessage(
-          `Đã tạo thành công bộ ${result.questions.length} câu hỏi môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}" bằng Model ổn định (gemini-2.5-flash)!`
+          `Đã tạo thành công bộ ${result.questions.length} câu hỏi có chiều sâu môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}" bằng Model ổn định (gemini-2.5-flash)!`
         );
       } else {
+        setIsErrorStatus(true);
         setStatusMessage(
           result.message ||
-            'Không thể tạo bộ câu hỏi từ Gemini AI. Vui lòng kiểm tra kết nối hoặc Cài đặt API Key!'
+            'Không thể tạo bộ câu hỏi từ Gemini AI. Vui lòng kiểm tra kết nối hoặc bấm "Cài Đặt API Key" để thay đổi API KEY GEMINI!'
         );
       }
     } catch (err: any) {
       console.error(err);
+      setIsErrorStatus(true);
       setStatusMessage(
         err?.message ||
-          'Lỗi kết nối tới máy chủ Gemini AI. Vui lòng thử lại hoặc kiểm tra khóa API!'
+          'Lỗi kết nối tới máy chủ Gemini AI. Vui lòng thử lại hoặc thay đổi khóa API KEY GEMINI!'
       );
     } finally {
       setIsLoading(false);

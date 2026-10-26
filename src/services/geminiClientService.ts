@@ -15,7 +15,7 @@ const LEGACY_API_KEY_STORAGE_KEYS = [
 
 /**
  * Danh sách các Model Gemini ổn định và chính xác nhất cho trích xuất PDF & tạo câu hỏi trắc nghiệm cấu trúc JSON.
- * Ưu tiên số 1: gemini-2.5-flash (Model ổn định chính thức, tốc độ phản hồi nhanh, đọc PDF đa phương thức chính xác tuyệt đối).
+ * Ưu tiên số 1: gemini-2.5-flash (Model ổn định chính thức, đọc PDF đa phương thức chính xác tuyệt đối).
  * Dự phòng: gemini-3-flash-preview, gemini-2.0-flash.
  */
 export const STABLE_GEMINI_MODELS = [
@@ -64,6 +64,66 @@ export function hasConfiguredGeminiApiKey(): boolean {
   return Boolean(getStoredGeminiApiKey());
 }
 
+/**
+ * Kiểm tra xem lỗi trả về từ Gemini API có phải là lỗi hết hạn mức (QUOTA / 429 / RESOURCE_EXHAUSTED)
+ * hoặc lỗi khóa API không hợp lệ hay không.
+ */
+export function analyzeGeminiError(errOrMsg: any): {
+  isQuotaError: boolean;
+  isAuthError: boolean;
+  formattedMessage: string;
+} {
+  const raw =
+    typeof errOrMsg === 'string'
+      ? errOrMsg
+      : errOrMsg?.message || errOrMsg?.error || JSON.stringify(errOrMsg || '');
+  const lower = String(raw).toLowerCase();
+
+  const isQuotaError =
+    lower.includes('429') ||
+    lower.includes('quota') ||
+    lower.includes('resource_exhausted') ||
+    lower.includes('rate limit') ||
+    lower.includes('too many requests') ||
+    lower.includes('exceeded your current quota') ||
+    lower.includes('billing');
+
+  if (isQuotaError) {
+    return {
+      isQuotaError: true,
+      isAuthError: false,
+      formattedMessage:
+        '⚠️ LỖI HẾT HẠN MỨC (QUOTA) GEMINI API KEY: Khóa API Gemini hiện tại đã hết hạn mức sử dụng (Quota Exhausted / 429). Vui lòng thay đổi sang API KEY GEMINI mới trong mục "Cài Đặt API Key"! (Hệ thống tuyệt đối không tự ý tạo câu hỏi ngẫu nhiên).',
+    };
+  }
+
+  const isAuthError =
+    lower.includes('api_key_invalid') ||
+    lower.includes('api key not valid') ||
+    lower.includes('invalid api key') ||
+    lower.includes('unauthenticated') ||
+    lower.includes('permission_denied') ||
+    lower.includes('chưa cấu hình gemini_api_key') ||
+    lower.includes('chưa được cấu hình');
+
+  if (isAuthError) {
+    return {
+      isQuotaError: false,
+      isAuthError: true,
+      formattedMessage:
+        '🔑 LỖI KHÓA GEMINI API KEY: Khóa API chưa được cấu hình hoặc không hợp lệ. Vui lòng bấm "Cài Đặt API Key" để nhập hoặc thay đổi API KEY GEMINI mới!',
+    };
+  }
+
+  return {
+    isQuotaError: false,
+    isAuthError: false,
+    formattedMessage:
+      raw ||
+      'Không thể tạo bộ câu hỏi từ Gemini AI. Vui lòng kiểm tra kết nối hoặc thay đổi API KEY GEMINI trong mục Cài đặt.',
+  };
+}
+
 export async function testGeminiApiKey(
   apiKey: string
 ): Promise<{ success: boolean; message: string }> {
@@ -73,6 +133,7 @@ export async function testGeminiApiKey(
   }
   try {
     const ai = new GoogleGenAI({ apiKey: cleanKey });
+    let lastErr: any = null;
     for (const m of STABLE_GEMINI_MODELS) {
       try {
         const res = await ai.models.generateContent({
@@ -85,54 +146,90 @@ export async function testGeminiApiKey(
             message: `Kết nối thành công với Model ổn định (${m})! Khóa API hoạt động tốt.`,
           };
         }
-      } catch {
-        // Thử model ổn định tiếp theo
+      } catch (err: any) {
+        lastErr = err;
+        const analysis = analyzeGeminiError(err);
+        if (analysis.isQuotaError || analysis.isAuthError) {
+          return {
+            success: false,
+            message: analysis.formattedMessage,
+          };
+        }
       }
     }
+    const finalAnalysis = analyzeGeminiError(lastErr);
     return {
       success: false,
-      message: 'Không thể xác thực khóa API. Vui lòng kiểm tra lại khóa AIzaSy...',
+      message: finalAnalysis.formattedMessage,
     };
   } catch (err: any) {
+    const analysis = analyzeGeminiError(err);
     return {
       success: false,
-      message: `Lỗi kết nối: ${err?.message || 'Khóa API không hợp lệ'}`,
+      message: analysis.formattedMessage,
     };
   }
 }
 
 /**
+ * Chuẩn hóa chuỗi câu hỏi để phát hiện trùng lặp nội dung tuyệt đối
+ */
+export function normalizeQuestionFingerprint(text: string): string {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/^câu\s*(?:hỏi)?\s*\d+\s*[:.)-]?\s*/i, '')
+    .replace(/^\[(?:vận dụng\s*)?nâng cao\]\s*/i, '')
+    .replace(/[.,?!;:"'()[\]{}“”‘’\-–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Chuẩn hóa danh sách câu hỏi từ AI:
- * 1. Loại bỏ các câu hỏi trùng lặp nội dung (đảm bảo 100% câu hỏi là duy nhất, không lặp lại).
- * 2. Đảm bảo có từ 1 đến 3 câu hỏi nâng cao (isAdvanced: true, difficulty: 'nang_cao').
+ * 1. Loại bỏ triệt để các câu hỏi có nội dung trùng lặp (cả trùng trực tiếp và trùng với bộ câu hỏi cũ nếu có).
+ * 2. Đảm bảo có từ 1 đến 3 câu hỏi nâng cao (isAdvanced: true, difficulty: 'nang_cao') mang tính chiều sâu.
  * 3. Đảm bảo nguyên tắc hình ảnh minh họa chỉ hiển thị 1 trong 2 vị trí:
  *    - 'question_image': Hình ảnh ở câu hỏi -> 4 đáp án A, B, C, D là văn bản.
  *    - 'options_image': Hình ảnh ở 4 đáp án -> Câu hỏi là văn bản.
  *    - 'text_only': Câu hỏi lý thuyết thuần văn bản.
  */
-export function normalizeQuestionVisuals(questions: Question[]): Question[] {
+export function normalizeQuestionVisuals(
+  questions: Question[],
+  excludeQuestionTexts: string[] = []
+): Question[] {
   if (!Array.isArray(questions) || questions.length === 0) return [];
 
-  // Bước 1: Lọc bỏ các câu hỏi trùng lặp nội dung
-  const seenNormalizedTexts = new Set<string>();
+  // Bước 1: Lọc bỏ triệt để các câu hỏi trùng lặp nội dung hoặc trùng đáp án đúng + câu hỏi
+  const seenFingerprints = new Set<string>(
+    excludeQuestionTexts.map((t) => normalizeQuestionFingerprint(t)).filter(Boolean)
+  );
+  const seenCorrectAnswerPairs = new Set<string>();
   const uniqueQuestions: Question[] = [];
 
   for (const q of questions) {
-    const rawQ = String(q.question || '').trim();
-    const cleanKey = rawQ
-      .toLowerCase()
-      .replace(/^câu\s*\d+\s*[:.]?\s*/i, '')
-      .replace(/^\[(?:vận dụng\s*)?nâng cao\]\s*/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+    const fp = normalizeQuestionFingerprint(q.question);
+    if (!fp) continue;
+    if (seenFingerprints.has(fp)) continue;
 
-    if (!cleanKey) continue;
-    if (seenNormalizedTexts.has(cleanKey)) continue;
-    seenNormalizedTexts.add(cleanKey);
+    // Kiểm tra thêm tổ hợp (ý chính câu hỏi + nội dung đáp án đúng) để tránh câu hỏi diễn đạt lại trùng ý
+    const correctOptText = Array.isArray(q.options)
+      ? normalizeQuestionFingerprint(q.options[q.correctIndex ?? 0] || '')
+      : '';
+    const stemWords = fp.split(' ').slice(0, 10).join(' ');
+    const comboKey = `${stemWords}__${correctOptText}`;
+    if (correctOptText && seenCorrectAnswerPairs.has(comboKey)) {
+      continue;
+    }
+
+    seenFingerprints.add(fp);
+    if (correctOptText) {
+      seenCorrectAnswerPairs.add(comboKey);
+    }
     uniqueQuestions.push(q);
   }
 
-  const sourceList = uniqueQuestions.length > 0 ? uniqueQuestions : questions;
+  const sourceList = uniqueQuestions.length > 0 ? uniqueQuestions : [];
+  if (sourceList.length === 0) return [];
 
   // Bước 2: Chuẩn hóa từng câu hỏi và kiểm tra quy tắc hình ảnh 1 trong 2
   const normalized = sourceList.map((q, idx) => {
@@ -162,7 +259,7 @@ export function normalizeQuestionVisuals(questions: Question[]): Question[] {
           ? q.correctIndex
           : 0,
       explanation: String(
-        q.explanation || 'Chúc mừng em đã trả lời chính xác kiến thức bài học!'
+        q.explanation || 'Chúc mừng em đã trả lời chính xác kiến thức trọng tâm của bài học!'
       ).trim(),
       difficulty: isAdvanced ? 'nang_cao' : 'co_ban',
       isAdvanced,
@@ -247,6 +344,7 @@ export function buildQuizGenerationPromptAndSchema(params: {
   questionCount: number;
   content?: string;
   hasPdf: boolean;
+  excludeQuestions?: string[];
 }) {
   const {
     lessonTitle,
@@ -256,6 +354,7 @@ export function buildQuizGenerationPromptAndSchema(params: {
     questionCount,
     content = '',
     hasPdf,
+    excludeQuestions = [],
   } = params;
 
   const detectedGrade =
@@ -265,8 +364,16 @@ export function buildQuizGenerationPromptAndSchema(params: {
   const targetAdvancedCount =
     questionCount <= 5 ? 1 : questionCount <= 10 ? 2 : 3;
 
+  const exclusionBlock =
+    excludeQuestions.length > 0
+      ? `\nDANH SÁCH CÁC CÂU HỎI ĐÃ TỪNG SỬ DỤNG (TUYỆT ĐỐI KHÔNG ĐƯỢC SỬ DỤNG LẠI HOẶC LẶP LẠI Ý CỦA CÁC CÂU NÀY):\n${excludeQuestions
+          .slice(0, 30)
+          .map((q, i) => `  - Câu cũ ${i + 1}: "${q}"`)
+          .join('\n')}\n`
+      : '';
+
   const systemInstruction = `Bạn là Chuyên gia Giáo dục Tiểu học & THCS hàng đầu Việt Nam (Chương trình GDPT 2018 - Kết nối tri thức với cuộc sống, Chân trời sáng tạo, Cánh diều).
-Nhiệm vụ của bạn là đọc kỹ thông tin bài học và tài liệu Sách Giáo Khoa (PDF) do giáo viên cung cấp để biên soạn đúng ${questionCount} câu hỏi trắc nghiệm khách quan hoàn toàn mới, chính xác tuyệt đối.
+Nhiệm vụ của bạn là đọc kỹ thông tin bài học và tài liệu Sách Giáo Khoa (PDF) do giáo viên cung cấp để biên soạn đúng ${questionCount} câu hỏi trắc nghiệm khách quan hoàn toàn mới, MANG TÍNH CHIỀU SÂU SƯ PHẠM và chính xác tuyệt đối.
 
 CÁC QUY TẮC BẮT BUỘC TUYỆT ĐỐI (KHÔNG ĐƯỢC VI PHẠM):
 1. ĐỌC KỸ BÀI HỌC TRONG SÁCH GIÁO KHOA / PDF VÀ BÁM SÁT 100% NỘI DUNG:
@@ -280,14 +387,15 @@ CÁC QUY TẮC BẮT BUỘC TUYỆT ĐỐI (KHÔNG ĐƯỢC VI PHẠM):
    }
    - NGHIÊM CẤM TUYỆT ĐỐI việc lệch môn học: Toàn bộ ${questionCount} câu hỏi phải thuộc đúng bài học "${lessonTitle}" của môn "${subject}".
 
-2. KHÔNG LẶP LẠI CÂU HỎI (100% CÂU HỎI KHÁC NHAU):
-   - Bạn phải tạo đúng ${questionCount} câu hỏi hoàn toàn khác nhau, mỗi câu hỏi khai thác một khía cạnh/đơn vị kiến thức riêng biệt từ đầu bài đến cuối bài học.
-   - TUYỆT ĐỐI KHÔNG ĐƯỢC lặp lại câu hỏi hoặc diễn đạt lại cùng một câu hỏi dưới bất kỳ hình thức nào.
+2. CÂU HỎI PHẢI MANG TÍNH CHIỀU SÂU & TUYỆT ĐỐI KHÔNG TRÙNG LẶP NỘI DUNG:
+   - Mỗi câu hỏi trong ${questionCount} câu phải khai thác một đơn vị kiến thức, tình huống hoặc góc nhìn hoàn toàn khác nhau trong bài học (từ mục Khởi động, Khám phá, Thực hành đến Vận dụng).
+   - Câu hỏi phải mang tính CHIỀU SÂU SƯ PHẠM: giúp học sinh hiểu bản chất vấn đề, mối quan hệ nguyên nhân - kết quả ("Vì sao...", "Mục đích chính của bước... là gì?", "Nếu thực hiện sai thao tác... thì điều gì sẽ xảy ra?", "So sánh đặc điểm..."), rèn luyện tư duy phản biện và kỹ năng thực hành thực tế thay vì các câu hỏi máy móc, bề nổi.
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC sử dụng lại hoặc diễn đạt lại các câu hỏi có nội dung trùng lặp vì sẽ gây nhàm chán cho học sinh.${exclusionBlock}
 
 3. BẮT BUỘC CÓ TỪ 1 ĐẾN 3 CÂU HỎI NÂNG CAO (difficulty = "nang_cao", isAdvanced = true):
    - Trong tổng số ${questionCount} câu hỏi, BẮT BUỘC phải có đúng ${targetAdvancedCount} câu hỏi nâng cao / vận dụng thực tiễn ("difficulty": "nang_cao", "isAdvanced": true).
-   - Các câu hỏi nâng cao yêu cầu học sinh vận dụng kiến thức bài học để giải quyết tình huống thực tế, giải thích nguyên nhân "Vì sao...", hoặc xử lý tình huống thực hành.
-   - Các câu hỏi còn lại là câu hỏi nhận biết và thông hiểu ("difficulty": "co_ban", "isAdvanced": false).
+   - Các câu hỏi nâng cao đặt học sinh vào tình huống thực tế sâu sắc, giải quyết vấn đề hoặc liên hệ thực tiễn từ bài học.
+   - Các câu hỏi còn lại là câu hỏi thông hiểu và nhận biết có chiều sâu ("difficulty": "co_ban", "isAdvanced": false).
 
 4. ƯU TIÊN CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRONG CÂU HỎI HOẶC TRONG CÁC ĐÁP ÁN (CHỈ HIỂN THỊ 1 TRONG 2):
    - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan trong câu hỏi hoặc trong các đáp án.
@@ -301,15 +409,15 @@ CÁC QUY TẮC BẮT BUỘC TUYỆT ĐỐI (KHÔNG ĐƯỢC VI PHẠM):
      * Môn Kỹ năng số: "strong_password", "shield_antivirus", "phishing_warning", "cloud_storage", "search_engine", "digital_citizenship", "ergonomic_posture".
      * Môn Trí tuệ nhân tạo: "ai_robot", "neural_brain", "face_recognition", "voice_assistant", "smart_home_iot", "self_driving_car", "chatbot_prompt".`;
 
-  const promptText = `Hãy phân tích kỹ tài liệu và thông tin bài học sau đây để tạo bộ câu hỏi trắc nghiệm:
+  const promptText = `Hãy phân tích kỹ tài liệu và thông tin bài học sau đây để tạo bộ câu hỏi trắc nghiệm có chiều sâu:
 - Môn học: ${subject}
 - Khối/Lớp: Khối ${detectedGrade} (${className || `Lớp ${detectedGrade}`})
 - Bài học giáo viên yêu cầu: "${lessonTitle}"
 ${content ? `- Ghi chú bổ sung: ${content}` : ''}
-
+${exclusionBlock}
 Yêu cầu xuất JSON chuẩn xác gồm:
 1. "lessonTitle": Tên đầy đủ chính xác của bài học trong Sách Giáo Khoa viết IN HOA TOÀN BỘ.
-2. "questions": Danh sách đúng ${questionCount} câu hỏi trắc nghiệm KHÁC NHAU HOÀN TOÀN (không câu nào lặp lại câu nào), bám sát 100% nội dung kiến thức trong bài "${lessonTitle}" của môn ${subject} (Khối ${detectedGrade}).
+2. "questions": Danh sách đúng ${questionCount} câu hỏi trắc nghiệm KHÁC NHAU HOÀN TOÀN (tuyệt đối không lặp lại câu hỏi hoặc trùng ý), mang tính chiều sâu sư phạm, bám sát 100% nội dung kiến thức trong bài "${lessonTitle}" của môn ${subject} (Khối ${detectedGrade}).
    - Bắt buộc có đúng ${targetAdvancedCount} câu hỏi nâng cao ("isAdvanced": true, "difficulty": "nang_cao").
    - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan trong câu hỏi ("question_image") hoặc trong 4 đáp án ("options_image") — hình ảnh chỉ hiển thị ở 1 trong 2 nơi.`;
 
@@ -390,11 +498,14 @@ async function generateQuizDirectlyWithClientKey(
     questionCount: number;
     content?: string;
     pdfBase64?: string | null;
+    excludeQuestions?: string[];
   }
 ): Promise<{
   success: boolean;
   questions?: Question[];
   resolvedLessonTitle?: string;
+  isQuotaError?: boolean;
+  isAuthError?: boolean;
   errorMessage?: string;
 }> {
   const ai = new GoogleGenAI({ apiKey });
@@ -422,6 +533,8 @@ async function generateQuizDirectlyWithClientKey(
   }
 
   let lastErr: any = null;
+  let detectedQuotaErr: any = null;
+
   for (const modelName of STABLE_GEMINI_MODELS) {
     try {
       const response = await ai.models.generateContent({
@@ -440,21 +553,42 @@ async function generateQuizDirectlyWithClientKey(
           .trim()
           .toUpperCase();
 
-        return {
-          success: true,
-          questions: normalizeQuestionVisuals(parsed.questions),
-          resolvedLessonTitle: finalTitle,
-        };
+        const normalizedList = normalizeQuestionVisuals(
+          parsed.questions,
+          params.excludeQuestions
+        );
+
+        if (normalizedList.length > 0) {
+          return {
+            success: true,
+            questions: normalizedList,
+            resolvedLessonTitle: finalTitle,
+          };
+        }
       }
     } catch (err: any) {
       lastErr = err;
+      const analysis = analyzeGeminiError(err);
+      if (analysis.isQuotaError) {
+        detectedQuotaErr = err;
+      }
+      if (analysis.isAuthError) {
+        return {
+          success: false,
+          isAuthError: true,
+          errorMessage: analysis.formattedMessage,
+        };
+      }
       console.warn(`Client Gemini model ${modelName} attempt failed:`, err);
     }
   }
 
+  const finalAnalysis = analyzeGeminiError(detectedQuotaErr || lastErr);
   return {
     success: false,
-    errorMessage: lastErr?.message || 'Không thể kết nối tới Gemini API.',
+    isQuotaError: finalAnalysis.isQuotaError,
+    isAuthError: finalAnalysis.isAuthError,
+    errorMessage: finalAnalysis.formattedMessage,
   };
 }
 
@@ -466,20 +600,34 @@ export async function extractQuizWithGemini(params: {
   questionCount: number;
   content?: string;
   pdfBase64?: string | null;
+  excludeQuestions?: string[];
 }): Promise<{
   success: boolean;
   questions?: Question[];
   resolvedLessonTitle?: string;
+  isQuotaError?: boolean;
+  isAuthError?: boolean;
   message?: string;
 }> {
   const userKey = getStoredGeminiApiKey();
 
-  // 1. Nếu giáo viên đã lưu khóa Gemini API trên trình duyệt -> Gọi trực tiếp tới Model ổn định (gemini-2.5-flash)
+  // 1. Nếu giáo viên đã nhập khóa Gemini API trên trình duyệt -> Gọi trực tiếp tới Model ổn định (gemini-2.5-flash)
   if (userKey) {
     const directRes = await generateQuizDirectlyWithClientKey(userKey, params);
     if (directRes.success && directRes.questions && directRes.questions.length > 0) {
       return directRes;
     }
+
+    // Nếu khóa API của người dùng bị hết QUOTA hoặc không hợp lệ -> Báo lỗi NGAY LẬP TỨC yêu cầu thay đổi API KEY GEMINI mới!
+    if (directRes.isQuotaError || directRes.isAuthError) {
+      return {
+        success: false,
+        isQuotaError: directRes.isQuotaError,
+        isAuthError: directRes.isAuthError,
+        message: directRes.errorMessage,
+      };
+    }
+
     // Nếu gửi kèm file PDF quá lớn (>20MB giới hạn inlineData của Google) gây lỗi payload, thử gọi lại với thông tin bài học chuẩn
     if (params.pdfBase64) {
       const retryWithoutOversizedPdf = await generateQuizDirectlyWithClientKey(userKey, {
@@ -493,10 +641,18 @@ export async function extractQuizWithGemini(params: {
       ) {
         return retryWithoutOversizedPdf;
       }
+      if (retryWithoutOversizedPdf.isQuotaError || retryWithoutOversizedPdf.isAuthError) {
+        return {
+          success: false,
+          isQuotaError: retryWithoutOversizedPdf.isQuotaError,
+          isAuthError: retryWithoutOversizedPdf.isAuthError,
+          message: retryWithoutOversizedPdf.errorMessage,
+        };
+      }
     }
   }
 
-  // 2. Gọi qua Backend Server (/api/gemini/extract-quiz) sử dụng Model ổn định gemini-2.5-flash
+  // 2. Gọi qua Backend Server / Vercel Serverless Function (/api/gemini/extract-quiz)
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
@@ -516,7 +672,8 @@ export async function extractQuizWithGemini(params: {
     });
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(data?.error || `HTTP ${response.status}`);
+      const errText = data?.message || data?.error || `HTTP ${response.status}`;
+      throw new Error(errText);
     }
     return data;
   };
@@ -524,10 +681,19 @@ export async function extractQuizWithGemini(params: {
   try {
     let result: any;
     try {
-      // Luôn gửi trực tiếp PDF lên Server trước (Server Express hỗ trợ tới 50MB)
-      result = await tryServerCall(true);
-    } catch (firstErr) {
-      // Nếu triển khai trên Vercel Serverless gặp giới hạn 4.5MB (HTTP 413) hoặc PDF quá nặng, tự động thử lại không đính kèm raw base64 để AI vẫn tạo đúng câu hỏi bài học
+      const canSendPdfToVercel =
+        Boolean(params.pdfBase64) && (params.pdfBase64?.length || 0) <= 3_800_000;
+      result = await tryServerCall(canSendPdfToVercel);
+    } catch (firstErr: any) {
+      const firstAnalysis = analyzeGeminiError(firstErr);
+      if (firstAnalysis.isQuotaError || firstAnalysis.isAuthError) {
+        return {
+          success: false,
+          isQuotaError: firstAnalysis.isQuotaError,
+          isAuthError: firstAnalysis.isAuthError,
+          message: firstAnalysis.formattedMessage,
+        };
+      }
       if (params.pdfBase64) {
         result = await tryServerCall(false);
       } else {
@@ -536,7 +702,10 @@ export async function extractQuizWithGemini(params: {
     }
 
     if (result?.success && Array.isArray(result.data?.questions) && result.data.questions.length > 0) {
-      const normalizedQuestions = normalizeQuestionVisuals(result.data.questions);
+      const normalizedQuestions = normalizeQuestionVisuals(
+        result.data.questions,
+        params.excludeQuestions
+      );
       const resolvedTitle = String(
         result.data.lessonTitle || params.lessonTitle || 'BÀI HỌC'
       )
@@ -550,20 +719,21 @@ export async function extractQuizWithGemini(params: {
       };
     }
 
+    const errAnalysis = analyzeGeminiError(result?.message || result?.error || '');
     return {
       success: false,
-      message:
-        result?.message ||
-        result?.error ||
-        'Không thể tạo bộ câu hỏi từ AI. Vui lòng kiểm tra kết nối hoặc Cài đặt API Key (biểu tượng bánh răng).',
+      isQuotaError: Boolean(result?.isQuotaError || errAnalysis.isQuotaError),
+      isAuthError: Boolean(result?.isAuthError || errAnalysis.isAuthError),
+      message: errAnalysis.formattedMessage,
     };
   } catch (err: any) {
     console.error('Gemini API extraction failed:', err);
+    const analysis = analyzeGeminiError(err);
     return {
       success: false,
-      message:
-        err?.message ||
-        'Không thể kết nối tới máy chủ Gemini AI. Vui lòng kiểm tra lại khóa Gemini API trong mục Cài đặt.',
+      isQuotaError: analysis.isQuotaError,
+      isAuthError: analysis.isAuthError,
+      message: analysis.formattedMessage,
     };
   }
 }

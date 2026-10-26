@@ -519,13 +519,8 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
           })
         : currentClass.teams;
 
-    // Pick initial random student & team
-    const randomTurn = pickRandomTurn(config.gameMode, newRacers, finalStudents);
-    const initialCalls: Record<string, number> = {};
-    if (randomTurn.studentName) {
-      initialCalls[normalizeEntityKey(randomTurn.studentName)] = 1;
-    }
-
+    // KHÔNG GỌI TÊN TRƯỚC KHI BẤM BẮT ĐẦU BẮT GÀ GỌI TÊN:
+    // Khi bắt đầu ván chơi, selectedStudentName = null cho đến khi giáo viên/học sinh bấm "Bắt đầu bắt gà gọi tên"
     set({
       currentClass: {
         ...currentClass,
@@ -536,9 +531,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       students: finalStudents,
       gameMode: config.gameMode,
       racers: newRacers,
-      currentRacerIndex: randomTurn.racerIndex,
-      selectedStudentName: randomTurn.studentName,
-      studentCallCounts: initialCalls,
+      currentRacerIndex: 0,
+      selectedStudentName: null,
+      studentCallCounts: {},
       sessionStudentRecords: {},
       selectedWeek: config.weekNumber,
       currentQuiz: newQuizSet,
@@ -554,7 +549,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   startRace: () => {
-    const { racers, currentQuiz, gameMode, students } = get();
+    const { racers, currentQuiz } = get();
     sound.stopCelebrationMusic();
     sound.playEngineRev();
 
@@ -571,17 +566,11 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       isNitro: false,
     }));
 
-    const randomTurn = pickRandomTurn(gameMode, resetRacers, students);
-    const initialCalls: Record<string, number> = {};
-    if (randomTurn.studentName) {
-      initialCalls[normalizeEntityKey(randomTurn.studentName)] = 1;
-    }
-
     set({
       racers: resetRacers,
-      currentRacerIndex: randomTurn.racerIndex,
-      selectedStudentName: randomTurn.studentName,
-      studentCallCounts: initialCalls,
+      currentRacerIndex: 0,
+      selectedStudentName: null,
+      studentCallCounts: {},
       sessionStudentRecords: {},
       activeQuestionIndex: 0,
       currentQuestion: currentQuiz?.questions[0] || null,
@@ -622,7 +611,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   },
 
   openNextQuestion: () => {
-    const { currentQuiz, activeQuestionIndex, racers, gameMode, students, studentCallCounts } = get();
+    const { currentQuiz, activeQuestionIndex, racers } = get();
     if (!currentQuiz || currentQuiz.questions.length === 0) return;
 
     const nextQIndex = activeQuestionIndex + 1;
@@ -646,21 +635,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       return;
     }
 
-    // Lượt gọi ngẫu nhiên hoàn toàn trên toàn bộ danh sách (một em có thể được Bà Già bắt trúng nhiều lần một cách ngẫu nhiên!)
-    const randomTurn = pickRandomTurn(gameMode, racers, students);
-    const nextCalls = { ...studentCallCounts };
-    if (randomTurn.studentName) {
-      const normKey = normalizeEntityKey(randomTurn.studentName);
-      nextCalls[normKey] = (nextCalls[normKey] || 0) + 1;
-    }
-
+    // KHÔNG GỌI TÊN TRƯỚC KHI BẤM BẮT ĐẦU BẮT GÀ GỌI TÊN:
+    // Sang câu hỏi mới, đặt selectedStudentName = null để học sinh / giáo viên bấm bắt gà mới gọi tên
     set({
       gameState: 'question',
       activeQuestionIndex: nextQIndex,
       currentQuestion: currentQuiz.questions[nextQIndex],
-      currentRacerIndex: randomTurn.racerIndex,
-      selectedStudentName: randomTurn.studentName,
-      studentCallCounts: nextCalls,
+      selectedStudentName: null,
       lastFeedback: null,
     });
   },
@@ -684,14 +665,14 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     const activeRacer = racers[currentRacerIndex] || racers[0];
     const isCorrect = optionIndex === currentQuestion.correctIndex;
 
-    // Tính số GIÂY trả lời câu hỏi này (làm tròn 1 chữ số thập phân, tối thiểu 0.1 giây, tối đa 30 giây)
+    // Tính số GIÂY trả lời câu hỏi này (làm tròn 1 chữ số thập phân, tối thiểu 0.1 giây, tối đa 60 giây = 1 phút)
     const rawSec =
       typeof elapsedSeconds === 'number' && !Number.isNaN(elapsedSeconds) && elapsedSeconds > 0
         ? elapsedSeconds
         : optionIndex === -1
-        ? 30
+        ? 60
         : 3.5;
-    const responseTimeSec = Math.max(0.1, Math.min(30, Math.round(rawSec * 10) / 10));
+    const responseTimeSec = Math.max(0.1, Math.min(60, Math.round(rawSec * 10) / 10));
 
     const newCombo = isCorrect ? activeRacer.combo + 1 : 0;
     let isNitroTriggered = false;
