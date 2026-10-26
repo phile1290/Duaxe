@@ -125,7 +125,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
           ) : (
             <div className="bg-amber-950/40 border border-amber-500/40 p-3 rounded-2xl text-xs text-amber-300 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>Chưa lưu khóa cá nhân. Ứng dụng hiện đang dùng ngân hàng đề thi sư phạm có sẵn.</span>
+              <span>Chưa lưu khóa cá nhân. Ứng dụng đang sử dụng trực tiếp Model ổn định (gemini-2.5-flash) từ máy chủ hệ thống.</span>
             </div>
           )}
         </div>

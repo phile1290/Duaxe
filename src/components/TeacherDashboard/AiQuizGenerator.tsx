@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { QuizSet, Question, SubjectType } from '../../types';
 import { extractQuizWithGemini, normalizeQuestionVisuals } from '../../services/geminiClientService';
-import { buildSubjectCurriculumQuestions } from '../../services/curriculumFallbackBank';
 import { ALLOWED_SUBJECTS } from '../../services/classroomStorageService';
 import {
   QuestionVisualIllustration,
@@ -50,14 +49,19 @@ export const AiQuizGenerator: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  // Call Gemini API via robust service
+  // Call Gemini API via stable gemini-2.5-flash model
   const handleGenerate = async () => {
+    if (!lessonTitle.trim()) {
+      setStatusMessage('Vui lòng nhập tên bài học hoặc số bài (ví dụ: Bài 3) trước khi tạo câu hỏi!');
+      return;
+    }
+
     setIsLoading(true);
     setStatusMessage(null);
 
     try {
       const result = await extractQuizWithGemini({
-        lessonTitle: lessonTitle || 'Bài 3',
+        lessonTitle: lessonTitle.trim(),
         subject,
         grade,
         questionCount,
@@ -65,47 +69,30 @@ export const AiQuizGenerator: React.FC = () => {
         pdfBase64,
       });
 
-      const curriculumBackup = buildSubjectCurriculumQuestions({
-        lessonTitle: lessonTitle || 'Bài 3',
-        subject,
-        gradeOrClassName: grade,
-        questionCount,
-      });
-
-      const resolvedUpperTitle = (
-        result.resolvedLessonTitle ||
-        curriculumBackup.resolvedLessonTitle ||
-        lessonTitle ||
-        'BÀI HỌC'
-      )
-        .trim()
-        .toUpperCase();
-      setLessonTitle(resolvedUpperTitle);
-
       if (result.success && result.questions && result.questions.length > 0) {
+        const resolvedUpperTitle = (
+          result.resolvedLessonTitle ||
+          lessonTitle ||
+          'BÀI HỌC'
+        )
+          .trim()
+          .toUpperCase();
+        setLessonTitle(resolvedUpperTitle);
         setGeneratedQuestions(normalizeQuestionVisuals(result.questions));
         setStatusMessage(
-          `Đã tạo thành công bộ câu hỏi môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}" (kèm 1-3 câu hỏi nâng cao)!`
+          `Đã tạo thành công bộ ${result.questions.length} câu hỏi môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}" bằng Model ổn định (gemini-2.5-flash)!`
         );
       } else {
-        setGeneratedQuestions(normalizeQuestionVisuals(curriculumBackup.questions));
         setStatusMessage(
           result.message ||
-            `Đã tạo thành công bộ câu hỏi môn ${subject} (Khối ${grade}) bám sát bài "${resolvedUpperTitle}"!`
+            'Không thể tạo bộ câu hỏi từ Gemini AI. Vui lòng kiểm tra kết nối hoặc Cài đặt API Key!'
         );
       }
     } catch (err: any) {
       console.error(err);
-      const curriculumBackup = buildSubjectCurriculumQuestions({
-        lessonTitle: lessonTitle || 'Bài 3',
-        subject,
-        gradeOrClassName: grade,
-        questionCount,
-      });
-      setLessonTitle(curriculumBackup.resolvedLessonTitle);
-      setGeneratedQuestions(normalizeQuestionVisuals(curriculumBackup.questions));
       setStatusMessage(
-        `Đã khởi tạo bộ câu hỏi chuẩn Chương trình GDPT 2018 cho bài "${curriculumBackup.resolvedLessonTitle}".`
+        err?.message ||
+          'Lỗi kết nối tới máy chủ Gemini AI. Vui lòng thử lại hoặc kiểm tra khóa API!'
       );
     } finally {
       setIsLoading(false);

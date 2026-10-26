@@ -4,10 +4,6 @@ import {
   resolveVisualDisplayMode,
   getUniformOptionVisuals,
 } from '../components/ClassroomGame/QuestionVisualIllustration';
-import {
-  resolveCurriculumLessonTitle,
-  buildSubjectCurriculumQuestions,
-} from './curriculumFallbackBank';
 
 const GEMINI_API_KEY_STORAGE_KEY = 'FOREST_CLIMB_GEMINI_API_KEY_V1';
 const LEGACY_API_KEY_STORAGE_KEYS = [
@@ -15,6 +11,17 @@ const LEGACY_API_KEY_STORAGE_KEYS = [
   'forest_climb_gemini_api_key',
   'gemini_api_key',
   'GEMINI_API_KEY',
+];
+
+/**
+ * Danh sách các Model Gemini ổn định và chính xác nhất cho trích xuất PDF & tạo câu hỏi trắc nghiệm cấu trúc JSON.
+ * Ưu tiên số 1: gemini-2.5-flash (Model ổn định chính thức, tốc độ phản hồi nhanh, đọc PDF đa phương thức chính xác tuyệt đối).
+ * Dự phòng: gemini-3-flash-preview, gemini-2.0-flash.
+ */
+export const STABLE_GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-3-flash-preview',
+  'gemini-2.0-flash',
 ];
 
 export function getStoredGeminiApiKey(): string {
@@ -66,8 +73,7 @@ export async function testGeminiApiKey(
   }
   try {
     const ai = new GoogleGenAI({ apiKey: cleanKey });
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest'];
-    for (const m of modelsToTry) {
+    for (const m of STABLE_GEMINI_MODELS) {
       try {
         const res = await ai.models.generateContent({
           model: m,
@@ -76,11 +82,11 @@ export async function testGeminiApiKey(
         if (res.text) {
           return {
             success: true,
-            message: 'Kết nối Gemini AI thành công! Khóa API hoạt động tốt.',
+            message: `Kết nối thành công với Model ổn định (${m})! Khóa API hoạt động tốt.`,
           };
         }
       } catch {
-        // try next model
+        // Thử model ổn định tiếp theo
       }
     }
     return {
@@ -96,17 +102,40 @@ export async function testGeminiApiKey(
 }
 
 /**
- * Chuẩn hóa danh sách câu hỏi đảm bảo:
- * 1. Trong bộ câu hỏi BẮT BUỘC có từ 1 đến 3 câu hỏi nâng cao (isAdvanced: true, difficulty: 'nang_cao').
- * 2. Ưu tiên các câu hỏi có hình ảnh minh họa trực quan trong câu hỏi HOẶC trong các đáp án (hình ảnh CHỈ hiển thị 1 trong 2 nơi):
- *    - 'question_image': Câu hỏi hiển thị hình ảnh -> 4 đáp án A, B, C, D là VĂN BẢN THUẦN TÚY (optionVisuals = [], optionSvgs = []).
- *    - 'options_image': 4 đáp án A, B, C, D là các hình ảnh đồng nhất -> Câu hỏi là VĂN BẢN THUẦN TÚY (visualData = '', visualKey = '', questionSvg = '').
- *    - 'text_only': Câu hỏi lý thuyết không cần hình ảnh -> Không ép hình ảnh sai lệch.
+ * Chuẩn hóa danh sách câu hỏi từ AI:
+ * 1. Loại bỏ các câu hỏi trùng lặp nội dung (đảm bảo 100% câu hỏi là duy nhất, không lặp lại).
+ * 2. Đảm bảo có từ 1 đến 3 câu hỏi nâng cao (isAdvanced: true, difficulty: 'nang_cao').
+ * 3. Đảm bảo nguyên tắc hình ảnh minh họa chỉ hiển thị 1 trong 2 vị trí:
+ *    - 'question_image': Hình ảnh ở câu hỏi -> 4 đáp án A, B, C, D là văn bản.
+ *    - 'options_image': Hình ảnh ở 4 đáp án -> Câu hỏi là văn bản.
+ *    - 'text_only': Câu hỏi lý thuyết thuần văn bản.
  */
 export function normalizeQuestionVisuals(questions: Question[]): Question[] {
   if (!Array.isArray(questions) || questions.length === 0) return [];
 
-  const normalized = questions.map((q, idx) => {
+  // Bước 1: Lọc bỏ các câu hỏi trùng lặp nội dung
+  const seenNormalizedTexts = new Set<string>();
+  const uniqueQuestions: Question[] = [];
+
+  for (const q of questions) {
+    const rawQ = String(q.question || '').trim();
+    const cleanKey = rawQ
+      .toLowerCase()
+      .replace(/^câu\s*\d+\s*[:.]?\s*/i, '')
+      .replace(/^\[(?:vận dụng\s*)?nâng cao\]\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!cleanKey) continue;
+    if (seenNormalizedTexts.has(cleanKey)) continue;
+    seenNormalizedTexts.add(cleanKey);
+    uniqueQuestions.push(q);
+  }
+
+  const sourceList = uniqueQuestions.length > 0 ? uniqueQuestions : questions;
+
+  // Bước 2: Chuẩn hóa từng câu hỏi và kiểm tra quy tắc hình ảnh 1 trong 2
+  const normalized = sourceList.map((q, idx) => {
     const cleanOptions =
       Array.isArray(q.options) && q.options.length === 4
         ? q.options.map((o) => String(o).trim())
@@ -114,7 +143,10 @@ export function normalizeQuestionVisuals(questions: Question[]): Question[] {
 
     const rawQText = String(q.question || `Câu hỏi ${idx + 1}`).trim();
     const isAdvFromText = /\[(?:vận dụng\s*)?nâng cao\]/i.test(rawQText);
-    const cleanQuestionText = rawQText.replace(/^\[(?:vận dụng\s*)?nâng cao\]\s*/i, '').trim();
+    const cleanQuestionText = rawQText
+      .replace(/^câu\s*\d+\s*[:.]?\s*/i, '')
+      .replace(/^\[(?:vận dụng\s*)?nâng cao\]\s*/i, '')
+      .trim();
 
     const isAdvanced = Boolean(
       q.isAdvanced || q.difficulty === 'nang_cao' || isAdvFromText
@@ -130,7 +162,7 @@ export function normalizeQuestionVisuals(questions: Question[]): Question[] {
           ? q.correctIndex
           : 0,
       explanation: String(
-        q.explanation || 'Chúc mừng em đã nắm vững kiến thức bài học!'
+        q.explanation || 'Chúc mừng em đã trả lời chính xác kiến thức bài học!'
       ).trim(),
       difficulty: isAdvanced ? 'nang_cao' : 'co_ban',
       isAdvanced,
@@ -172,34 +204,34 @@ export function normalizeQuestionVisuals(questions: Question[]): Question[] {
     };
   });
 
-  // Đảm bảo số lượng câu hỏi nâng cao trong bộ đề luôn nằm trong khoảng từ 1 đến 3 câu
+  // Bước 3: Đảm bảo trong bộ câu hỏi có từ 1 đến 3 câu hỏi nâng cao
   const total = normalized.length;
-  const minAdvanced = 1;
-  const maxAdvanced = Math.min(3, total);
-  const desiredAdvanced = total <= 5 ? 1 : total <= 10 ? 2 : Math.min(3, total);
+  if (total > 0) {
+    const minAdvanced = 1;
+    const maxAdvanced = Math.min(3, total);
+    const desiredAdvanced = total <= 5 ? 1 : total <= 10 ? 2 : Math.min(3, total);
 
-  let currentAdvIndices = normalized
-    .map((q, i) => (q.isAdvanced ? i : -1))
-    .filter((i) => i !== -1);
+    const currentAdvIndices = normalized
+      .map((q, i) => (q.isAdvanced ? i : -1))
+      .filter((i) => i !== -1);
 
-  // Nếu có nhiều hơn 3 câu nâng cao -> chỉ giữ lại 3 câu nâng cao cuối cùng
-  if (currentAdvIndices.length > maxAdvanced) {
-    const keepSet = new Set(currentAdvIndices.slice(-maxAdvanced));
-    normalized.forEach((q, idx) => {
-      const keep = keepSet.has(idx);
-      q.isAdvanced = keep;
-      q.difficulty = keep ? 'nang_cao' : 'co_ban';
-      q.points = keep ? 15 : 10;
-    });
-  } else if (currentAdvIndices.length < minAdvanced) {
-    // Nếu chưa có câu nâng cao nào -> chọn từ 1 đến desiredAdvanced câu ở cuối bộ đề làm câu hỏi nâng cao
-    const needed = Math.min(desiredAdvanced, total);
-    for (let k = 0; k < needed; k++) {
-      const targetIdx = total - 1 - k;
-      if (targetIdx >= 0) {
-        normalized[targetIdx].isAdvanced = true;
-        normalized[targetIdx].difficulty = 'nang_cao';
-        normalized[targetIdx].points = 15;
+    if (currentAdvIndices.length > maxAdvanced) {
+      const keepSet = new Set(currentAdvIndices.slice(-maxAdvanced));
+      normalized.forEach((q, idx) => {
+        const keep = keepSet.has(idx);
+        q.isAdvanced = keep;
+        q.difficulty = keep ? 'nang_cao' : 'co_ban';
+        q.points = keep ? 15 : 10;
+      });
+    } else if (currentAdvIndices.length < minAdvanced) {
+      const needed = Math.min(desiredAdvanced, total);
+      for (let k = 0; k < needed; k++) {
+        const targetIdx = total - 1 - k;
+        if (targetIdx >= 0) {
+          normalized[targetIdx].isAdvanced = true;
+          normalized[targetIdx].difficulty = 'nang_cao';
+          normalized[targetIdx].points = 15;
+        }
       }
     }
   }
@@ -230,62 +262,55 @@ export function buildQuizGenerationPromptAndSchema(params: {
     grade ||
     (className.match(/[1-9]/) ? parseInt(className.match(/[1-9]/)![0], 10) : 4);
 
-  const suggestedCurriculumTitle = resolveCurriculumLessonTitle(
-    lessonTitle,
-    subject,
-    detectedGrade
-  );
-
   const targetAdvancedCount =
     questionCount <= 5 ? 1 : questionCount <= 10 ? 2 : 3;
 
-  const systemInstruction = `Bạn là Chuyên gia Giáo dục Tiểu học & THCS hàng đầu Việt Nam (Chương trình GDPT 2018 - các bộ sách Kết nối tri thức với cuộc sống, Chân trời sáng tạo, Cánh diều).
-Nhiệm vụ của bạn là đọc kỹ thông tin bài học và tài liệu Sách Giáo Khoa (PDF) do giáo viên cung cấp để biên soạn đúng ${questionCount} câu hỏi trắc nghiệm khách quan.
+  const systemInstruction = `Bạn là Chuyên gia Giáo dục Tiểu học & THCS hàng đầu Việt Nam (Chương trình GDPT 2018 - Kết nối tri thức với cuộc sống, Chân trời sáng tạo, Cánh diều).
+Nhiệm vụ của bạn là đọc kỹ thông tin bài học và tài liệu Sách Giáo Khoa (PDF) do giáo viên cung cấp để biên soạn đúng ${questionCount} câu hỏi trắc nghiệm khách quan hoàn toàn mới, chính xác tuyệt đối.
 
 CÁC QUY TẮC BẮT BUỘC TUYỆT ĐỐI (KHÔNG ĐƯỢC VI PHẠM):
-1. XÁC ĐỊNH ĐÚNG BÀI HỌC VÀ ĐỌC TOÀN BỘ KIẾN THỨC TRONG BÀI:
-   - Giáo viên đang chọn:
-     + Môn học: "${subject}"
-     + Khối/Lớp: "Khối ${detectedGrade}" (${className || `Lớp ${detectedGrade}`})
-     + Yêu cầu bài học: "${lessonTitle}" (Gợi ý chương trình GDPT 2018: "${suggestedCurriculumTitle}")
+1. ĐỌC KỸ BÀI HỌC TRONG SÁCH GIÁO KHOA / PDF VÀ BÁM SÁT 100% NỘI DUNG:
+   - Môn học: "${subject}"
+   - Khối/Lớp: Khối ${detectedGrade} (${className || `Lớp ${detectedGrade}`})
+   - Yêu cầu bài học từ giáo viên: "${lessonTitle}"
    - ${
      hasPdf
-       ? `Giáo viên ĐÃ TẢI LÊN FILE PDF SÁCH GIÁO KHOA. Bạn BẮT BUỘC phải tìm xem "${lessonTitle}" trong file PDF sách giáo khoa "${subject} ${detectedGrade}" đó là bài học gì (tra cứu Mục lục hoặc tiêu đề bài học trong PDF), trích xuất đầy đủ tên bài học viết IN HOA vào trường "lessonTitle" (ví dụ: "BÀI 3: VẬT LIỆU VÀ DỤNG CỤ TRỒNG HOA, CÂY CẢNH TRONG CHẬU") và đọc TẤT CẢ các nội dung kiến thức, hình vẽ, hộp kiến thức, luyện tập, vận dụng trong bài học đó để tạo bộ câu hỏi.`
-       : `Hãy xác định đúng tên đầy đủ của "${lessonTitle}" thuộc môn "${subject}" lớp ${detectedGrade} theo chương trình GDPT 2018, xuất tên bài đầy đủ viết IN HOA vào trường "lessonTitle" (ví dụ: "${suggestedCurriculumTitle}") và tạo bộ câu hỏi bám sát 100% nội dung bài học đó.`
+       ? `Giáo viên ĐÃ TẢI LÊN FILE PDF SÁCH GIÁO KHOA. Bạn BẮT BUỘC phải tìm chính xác bài "${lessonTitle}" trong file PDF sách giáo khoa "${subject} ${detectedGrade}" (tra cứu Mục lục và các trang nội dung của bài học đó trong PDF), trích xuất đầy đủ tên bài học viết IN HOA vào trường "lessonTitle" (ví dụ: "BÀI 3: VẬT LIỆU VÀ DỤNG CỤ TRỒNG HOA, CÂY CẢNH TRONG CHẬU") và đọc TẤT CẢ các mục kiến thức, hình minh họa, khám phá, luyện tập, vận dụng trong bài học đó để tạo bộ câu hỏi.`
+       : `Hãy xác định đúng tên đầy đủ của "${lessonTitle}" thuộc môn "${subject}" lớp ${detectedGrade} theo chương trình Sách Giáo Khoa GDPT 2018, xuất tên bài đầy đủ viết IN HOA vào trường "lessonTitle" và tạo bộ câu hỏi bám sát 100% nội dung kiến thức của bài học đó.`
    }
-   - NGHIÊM CẤM TUYỆT ĐỐI việc lệch môn học: Khi môn học là "${subject}", 100% câu hỏi phải thuộc bài học "${lessonTitle}" của môn "${subject}". Tuyệt đối KHÔNG ĐƯỢC sinh câu hỏi môn Toán (đồng hồ, phép tính...) hay môn Tin học khi người dùng đang chọn môn Công nghệ!
+   - NGHIÊM CẤM TUYỆT ĐỐI việc lệch môn học: Toàn bộ ${questionCount} câu hỏi phải thuộc đúng bài học "${lessonTitle}" của môn "${subject}".
 
-2. BẮT BUỘC CÓ TỪ 1 ĐẾN 3 CÂU HỎI NÂNG CAO (difficulty = "nang_cao", isAdvanced = true):
-   - Trong tổng số ${questionCount} câu hỏi, BẮT BUỘC phải có đúng ${targetAdvancedCount} câu hỏi nâng cao / vận dụng thực tiễn (đặt "difficulty": "nang_cao" và "isAdvanced": true).
-   - Các câu hỏi nâng cao tập trung vào vận dụng kiến thức trong bài học để giải quyết tình huống thực tế, giải thích nguyên nhân "Vì sao...", hoặc xử lý tình huống thực hành.
+2. KHÔNG LẶP LẠI CÂU HỎI (100% CÂU HỎI KHÁC NHAU):
+   - Bạn phải tạo đúng ${questionCount} câu hỏi hoàn toàn khác nhau, mỗi câu hỏi khai thác một khía cạnh/đơn vị kiến thức riêng biệt từ đầu bài đến cuối bài học.
+   - TUYỆT ĐỐI KHÔNG ĐƯỢC lặp lại câu hỏi hoặc diễn đạt lại cùng một câu hỏi dưới bất kỳ hình thức nào.
+
+3. BẮT BUỘC CÓ TỪ 1 ĐẾN 3 CÂU HỎI NÂNG CAO (difficulty = "nang_cao", isAdvanced = true):
+   - Trong tổng số ${questionCount} câu hỏi, BẮT BUỘC phải có đúng ${targetAdvancedCount} câu hỏi nâng cao / vận dụng thực tiễn ("difficulty": "nang_cao", "isAdvanced": true).
+   - Các câu hỏi nâng cao yêu cầu học sinh vận dụng kiến thức bài học để giải quyết tình huống thực tế, giải thích nguyên nhân "Vì sao...", hoặc xử lý tình huống thực hành.
    - Các câu hỏi còn lại là câu hỏi nhận biết và thông hiểu ("difficulty": "co_ban", "isAdvanced": false).
 
-3. ƯU TIÊN CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRONG CÂU HỎI HOẶC TRONG CÁC ĐÁP ÁN (HÌNH ẢNH CHỈ HIỂN THỊ 1 TRONG 2):
-   - Ưu tiên cao các câu hỏi có hình ảnh minh họa trực quan (chiếm khoảng 75% - 85% tổng số câu hỏi) để học sinh hứng thú.
+4. ƯU TIÊN CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRONG CÂU HỎI HOẶC TRONG CÁC ĐÁP ÁN (CHỈ HIỂN THỊ 1 TRONG 2):
+   - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan trong câu hỏi hoặc trong các đáp án.
    - QUY TẮC BẮT BUỘC VỀ VỊ TRÍ HÌNH ẢNH (CHỈ HIỂN THỊ 1 TRONG 2 NƠI):
      + Chế độ 1 ("visualDisplayMode": "question_image"): Hình ảnh hiển thị Ở CÂU HỎI -> Khi đó cả 4 đáp án A, B, C, D BẮT BUỘC chỉ là VĂN BẢN (optionVisuals = []).
-     + Chế độ 2 ("visualDisplayMode": "options_image"): Hình ảnh hiển thị Ở CẢ 4 ĐÁP ÁN A, B, C, D -> Khi đó câu hỏi BẮT BUỘC chỉ là VĂN BẢN (visualKey = "", visualData = "") và mảng optionVisuals phải có đủ 4 mã hình ảnh tương ứng với 4 đáp án.
-     + Chế độ 3 ("visualDisplayMode": "text_only"): Câu hỏi thuần văn bản (khi nội dung lý thuyết không cần hình).
-   - Danh mục mã hình vẽ chuẩn ("visualKey" / "optionVisuals") theo từng môn:
-     * Môn Công nghệ (Trồng hoa, cây cảnh, dụng cụ & thiết bị):
-       "flower_pot" (Chậu trồng cây có lỗ thoát nước), "plant_flower" (Chậu hoa đang nở), "cactus_succulent" (Cây xương rồng/sen đá), "bonsai_tree" (Cây cảnh lá xanh), "soil_substrate" (Giá thể trồng cây: đất, xơ dừa, trấu hun), "garden_trowel" (Xẻng nhỏ làm vườn), "garden_fork" (Chĩa ba xới đất), "watering_can" (Bình tưới nước hoa sen), "pruning_shears" (Kéo cắt cành), "garden_gloves" (Găng tay làm vườn), "seed_sprout" (Gieo hạt và cây con), "sunlight_care" (Ánh sáng mặt trời), "fertilizer_bag" (Phân bón cây), "desk_lamp" (Đèn học), "electric_fan" (Quạt điện), "television_set" (Máy thu hình/Ti vi), "radio_set" (Máy thu thanh/Radio), "refrigerator" (Tủ lạnh), "telephone_emergency" (Điện thoại khẩn cấp), "traffic_sign_stop" (Biển báo giao thông), "paper_pinwheel" (Chong chóng đồ chơi dân gian), "wrench_screwdriver" (Cờ-lê và Tua-vít lắp ghép mô hình), "solar_wind_model" (Mô hình điện mặt trời/điện gió).
-     * Môn Tin học:
-       "cpu_tower", "monitor", "mouse", "keyboard", "speaker", "printer", "headphones", "usb_drive", "hard_drive", "power_cable", "mousepad", "laptop", "hardware_overview", "word_icon", "powerpoint_icon", "excel_icon", "paint_icon", "scratch_icon", "browser_icon", "windows_icon", "folder_icon", "software_overview".
-     * Môn Kỹ năng số:
-       "strong_password", "shield_antivirus", "phishing_warning", "cloud_storage", "search_engine", "digital_citizenship", "ergonomic_posture".
-     * Môn Trí tuệ nhân tạo:
-       "ai_robot", "neural_brain", "face_recognition", "voice_assistant", "smart_home_iot", "self_driving_car", "chatbot_prompt".`;
+     + Chế độ 2 ("visualDisplayMode": "options_image"): Hình ảnh hiển thị Ở CẢ 4 ĐÁP ÁN A, B, C, D -> Khi đó câu hỏi BẮT BUỘC chỉ là VĂN BẢN (visualKey = "", visualData = "") và mảng optionVisuals phải có đủ 4 mã hình ảnh khác nhau tương ứng với 4 đáp án.
+     + Chế độ 3 ("visualDisplayMode": "text_only"): Câu hỏi lý thuyết thuần văn bản (khi câu hỏi không có hình vẽ tương ứng chính xác trong danh mục dưới đây).
+   - CHỈ sử dụng mã hình ảnh ("visualKey" / "optionVisuals") khi thực sự khớp 100% với nội dung câu hỏi:
+     * Môn Công nghệ: "flower_pot" (Chậu trồng cây có lỗ thoát nước), "plant_flower" (Chậu hoa đang nở), "cactus_succulent" (Cây xương rồng/sen đá), "bonsai_tree" (Cây cảnh lá xanh), "soil_substrate" (Giá thể trồng cây: đất, xơ dừa, trấu hun), "garden_trowel" (Xẻng nhỏ làm vườn), "garden_fork" (Chĩa ba xới đất), "watering_can" (Bình tưới nước hoa sen), "pruning_shears" (Kéo cắt cành), "garden_gloves" (Găng tay làm vườn), "seed_sprout" (Gieo hạt và cây con), "sunlight_care" (Ánh sáng mặt trời), "fertilizer_bag" (Phân bón cây), "desk_lamp" (Đèn học), "electric_fan" (Quạt điện), "television_set" (Máy thu hình/Ti vi), "radio_set" (Máy thu thanh/Radio), "refrigerator" (Tủ lạnh), "telephone_emergency" (Điện thoại khẩn cấp), "traffic_sign_stop" (Biển báo giao thông), "paper_pinwheel" (Chong chóng đồ chơi dân gian), "wrench_screwdriver" (Cờ-lê và Tua-vít lắp ghép mô hình), "solar_wind_model" (Mô hình điện mặt trời/điện gió).
+     * Môn Tin học: "cpu_tower", "monitor", "mouse", "keyboard", "speaker", "printer", "headphones", "usb_drive", "hard_drive", "power_cable", "mousepad", "laptop", "hardware_overview", "word_icon", "powerpoint_icon", "excel_icon", "paint_icon", "scratch_icon", "browser_icon", "windows_icon", "folder_icon", "software_overview".
+     * Môn Kỹ năng số: "strong_password", "shield_antivirus", "phishing_warning", "cloud_storage", "search_engine", "digital_citizenship", "ergonomic_posture".
+     * Môn Trí tuệ nhân tạo: "ai_robot", "neural_brain", "face_recognition", "voice_assistant", "smart_home_iot", "self_driving_car", "chatbot_prompt".`;
 
-  const promptText = `Hãy phân tích kỹ tài liệu và thông tin sau đây:
+  const promptText = `Hãy phân tích kỹ tài liệu và thông tin bài học sau đây để tạo bộ câu hỏi trắc nghiệm:
 - Môn học: ${subject}
 - Khối/Lớp: Khối ${detectedGrade} (${className || `Lớp ${detectedGrade}`})
-- Bài học người dùng nhập: "${lessonTitle}" (Tên bài chuẩn tham chiếu nếu trùng: "${suggestedCurriculumTitle}")
+- Bài học giáo viên yêu cầu: "${lessonTitle}"
 ${content ? `- Ghi chú bổ sung: ${content}` : ''}
 
 Yêu cầu xuất JSON chuẩn xác gồm:
-1. "lessonTitle": Tên đầy đủ của bài học viết IN HOA TOÀN BỘ (ví dụ: "${suggestedCurriculumTitle}"). Không được chỉ ghi mỗi chữ "${lessonTitle.toUpperCase()}" nếu xác định được tên bài học trong sách giáo khoa.
-2. "questions": Danh sách đúng ${questionCount} câu hỏi trắc nghiệm bám sát 100% kiến thức trong bài học của môn ${subject} (tuyệt đối không lạc sang môn học khác).
-   - Có đúng ${targetAdvancedCount} câu hỏi nâng cao ("isAdvanced": true, "difficulty": "nang_cao").
+1. "lessonTitle": Tên đầy đủ chính xác của bài học trong Sách Giáo Khoa viết IN HOA TOÀN BỘ.
+2. "questions": Danh sách đúng ${questionCount} câu hỏi trắc nghiệm KHÁC NHAU HOÀN TOÀN (không câu nào lặp lại câu nào), bám sát 100% nội dung kiến thức trong bài "${lessonTitle}" của môn ${subject} (Khối ${detectedGrade}).
+   - Bắt buộc có đúng ${targetAdvancedCount} câu hỏi nâng cao ("isAdvanced": true, "difficulty": "nang_cao").
    - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan trong câu hỏi ("question_image") hoặc trong 4 đáp án ("options_image") — hình ảnh chỉ hiển thị ở 1 trong 2 nơi.`;
 
   const responseSchema = {
@@ -352,15 +377,8 @@ Yêu cầu xuất JSON chuẩn xác gồm:
     required: ['lessonTitle', 'questions'],
   };
 
-  return { systemInstruction, promptText, responseSchema, suggestedCurriculumTitle };
+  return { systemInstruction, promptText, responseSchema };
 }
-
-const GEMINI_MODEL_CHAIN = [
-  'gemini-3.8-flash',
-  'gemini-2.5-flash',
-  'gemini-flash-latest',
-  'gemini-2.0-flash',
-];
 
 async function generateQuizDirectlyWithClientKey(
   apiKey: string,
@@ -377,9 +395,10 @@ async function generateQuizDirectlyWithClientKey(
   success: boolean;
   questions?: Question[];
   resolvedLessonTitle?: string;
+  errorMessage?: string;
 }> {
   const ai = new GoogleGenAI({ apiKey });
-  const { systemInstruction, promptText, responseSchema, suggestedCurriculumTitle } =
+  const { systemInstruction, promptText, responseSchema } =
     buildQuizGenerationPromptAndSchema({
       ...params,
       hasPdf: Boolean(params.pdfBase64),
@@ -402,7 +421,8 @@ async function generateQuizDirectlyWithClientKey(
     };
   }
 
-  for (const modelName of GEMINI_MODEL_CHAIN) {
+  let lastErr: any = null;
+  for (const modelName of STABLE_GEMINI_MODELS) {
     try {
       const response = await ai.models.generateContent({
         model: modelName,
@@ -416,11 +436,9 @@ async function generateQuizDirectlyWithClientKey(
 
       const parsed = JSON.parse(response.text || '{}');
       if (Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-        const rawResolved = String(parsed.lessonTitle || '').trim().toUpperCase();
-        const finalTitle =
-          rawResolved && rawResolved.length > params.lessonTitle.trim().length
-            ? rawResolved
-            : suggestedCurriculumTitle;
+        const finalTitle = String(parsed.lessonTitle || params.lessonTitle || '')
+          .trim()
+          .toUpperCase();
 
         return {
           success: true,
@@ -428,12 +446,16 @@ async function generateQuizDirectlyWithClientKey(
           resolvedLessonTitle: finalTitle,
         };
       }
-    } catch (err) {
+    } catch (err: any) {
+      lastErr = err;
       console.warn(`Client Gemini model ${modelName} attempt failed:`, err);
     }
   }
 
-  return { success: false };
+  return {
+    success: false,
+    errorMessage: lastErr?.message || 'Không thể kết nối tới Gemini API.',
+  };
 }
 
 export async function extractQuizWithGemini(params: {
@@ -448,37 +470,39 @@ export async function extractQuizWithGemini(params: {
   success: boolean;
   questions?: Question[];
   resolvedLessonTitle?: string;
-  fallback?: boolean;
   message?: string;
 }> {
   const userKey = getStoredGeminiApiKey();
-  const suggestedTitle = resolveCurriculumLessonTitle(
-    params.lessonTitle,
-    params.subject || 'Công nghệ',
-    params.grade || params.className
-  );
 
-  // 1. Nếu người dùng đã cấu hình API Key trên trình duyệt -> Gọi trực tiếp GoogleGenAI từ trình duyệt trước
-  // (Giúp đọc trực tiếp file PDF dung lượng lớn lên tới 20MB+ mà không bị giới hạn 4.5MB body của Vercel Serverless)
+  // 1. Nếu giáo viên đã lưu khóa Gemini API trên trình duyệt -> Gọi trực tiếp tới Model ổn định (gemini-2.5-flash)
   if (userKey) {
     const directRes = await generateQuizDirectlyWithClientKey(userKey, params);
     if (directRes.success && directRes.questions && directRes.questions.length > 0) {
       return directRes;
     }
+    // Nếu gửi kèm file PDF quá lớn (>20MB giới hạn inlineData của Google) gây lỗi payload, thử gọi lại với thông tin bài học chuẩn
+    if (params.pdfBase64) {
+      const retryWithoutOversizedPdf = await generateQuizDirectlyWithClientKey(userKey, {
+        ...params,
+        pdfBase64: null,
+      });
+      if (
+        retryWithoutOversizedPdf.success &&
+        retryWithoutOversizedPdf.questions &&
+        retryWithoutOversizedPdf.questions.length > 0
+      ) {
+        return retryWithoutOversizedPdf;
+      }
+    }
   }
 
-  // 2. Gọi qua API Server (/api/gemini/extract-quiz)
+  // 2. Gọi qua Backend Server (/api/gemini/extract-quiz) sử dụng Model ổn định gemini-2.5-flash
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
   if (userKey) {
     headers['x-gemini-api-key'] = userKey;
   }
-
-  // Lưu ý: Trên Vercel Serverless, body vượt quá ~4.2MB sẽ bị lỗi 413 Payload Too Large.
-  // Nếu file PDF nhỏ hơn 3.2MB base64 thì gửi trực tiếp; nếu lớn hơn hoặc bị lỗi 413 thì tự động gửi yêu cầu kèm thông tin bài học chuẩn để Server Gemini vẫn xử lý mượt mà.
-  const isPdfSmallEnoughForServerless =
-    !params.pdfBase64 || params.pdfBase64.length <= 3_200_000;
 
   const tryServerCall = async (includePdf: boolean) => {
     const response = await fetch('/api/gemini/extract-quiz', {
@@ -490,32 +514,34 @@ export async function extractQuizWithGemini(params: {
         apiKey: userKey || undefined,
       }),
     });
+    const data = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(data?.error || `HTTP ${response.status}`);
     }
-    return response.json();
+    return data;
   };
 
   try {
     let result: any;
     try {
-      result = await tryServerCall(isPdfSmallEnoughForServerless);
+      // Luôn gửi trực tiếp PDF lên Server trước (Server Express hỗ trợ tới 50MB)
+      result = await tryServerCall(true);
     } catch (firstErr) {
-      if (params.pdfBase64 && isPdfSmallEnoughForServerless) {
-        // Thử lại không đính kèm base64 nặng nếu gặp lỗi 413 trên Vercel
+      // Nếu triển khai trên Vercel Serverless gặp giới hạn 4.5MB (HTTP 413) hoặc PDF quá nặng, tự động thử lại không đính kèm raw base64 để AI vẫn tạo đúng câu hỏi bài học
+      if (params.pdfBase64) {
         result = await tryServerCall(false);
       } else {
         throw firstErr;
       }
     }
 
-    if (result?.success && result.data?.questions?.length > 0) {
+    if (result?.success && Array.isArray(result.data?.questions) && result.data.questions.length > 0) {
       const normalizedQuestions = normalizeQuestionVisuals(result.data.questions);
-      const rawServerTitle = String(result.data.lessonTitle || '').trim().toUpperCase();
-      const resolvedTitle =
-        rawServerTitle && rawServerTitle.length > params.lessonTitle.trim().length
-          ? rawServerTitle
-          : suggestedTitle;
+      const resolvedTitle = String(
+        result.data.lessonTitle || params.lessonTitle || 'BÀI HỌC'
+      )
+        .trim()
+        .toUpperCase();
 
       return {
         success: true,
@@ -523,23 +549,21 @@ export async function extractQuizWithGemini(params: {
         resolvedLessonTitle: resolvedTitle,
       };
     }
+
+    return {
+      success: false,
+      message:
+        result?.message ||
+        result?.error ||
+        'Không thể tạo bộ câu hỏi từ AI. Vui lòng kiểm tra kết nối hoặc Cài đặt API Key (biểu tượng bánh răng).',
+    };
   } catch (err: any) {
-    console.warn('Server Gemini API fallback triggered:', err);
+    console.error('Gemini API extraction failed:', err);
+    return {
+      success: false,
+      message:
+        err?.message ||
+        'Không thể kết nối tới máy chủ Gemini AI. Vui lòng kiểm tra lại khóa Gemini API trong mục Cài đặt.',
+    };
   }
-
-  // 3. Nếu chưa có API Key hoặc mất kết nối -> Sử dụng Ngân hàng bài học Chương trình GDPT 2018 đúng 100% Môn học & Bài học
-  const fallbackCurriculum = buildSubjectCurriculumQuestions({
-    lessonTitle: params.lessonTitle,
-    subject: params.subject || 'Công nghệ',
-    gradeOrClassName: params.grade || params.className,
-    questionCount: params.questionCount,
-  });
-
-  return {
-    success: true,
-    fallback: true,
-    questions: normalizeQuestionVisuals(fallbackCurriculum.questions),
-    resolvedLessonTitle: fallbackCurriculum.resolvedLessonTitle,
-    message: `Đã trích xuất bộ câu hỏi chuẩn Chương trình GDPT 2018 cho bài "${fallbackCurriculum.resolvedLessonTitle}"!`,
-  };
 }

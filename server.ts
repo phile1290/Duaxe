@@ -10,10 +10,12 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const GEMINI_MODEL_CHAIN = [
-  'gemini-3.8-flash',
+/**
+ * Danh sách Model Gemini ổn định và chính xác nhất (ưu tiên số 1: gemini-2.5-flash).
+ */
+const STABLE_GEMINI_MODELS = [
   'gemini-2.5-flash',
-  'gemini-flash-latest',
+  'gemini-3-flash-preview',
   'gemini-2.0-flash',
 ];
 
@@ -50,8 +52,8 @@ async function startServer() {
       if (!activeApiKey) {
         return res.status(200).json({
           success: false,
-          fallback: true,
-          message: 'GEMINI_API_KEY chưa được cấu hình. Hãy bấm biểu tượng Cài Đặt (Bánh răng) để nhập khóa Gemini API một lần duy nhất.',
+          message:
+            'GEMINI_API_KEY chưa được cấu hình. Hãy bấm biểu tượng Cài Đặt API Key (bánh răng) để nhập khóa Gemini API một lần duy nhất.',
         });
       }
 
@@ -79,13 +81,16 @@ YÊU CẦU BẮT BUỘC TUYỆT ĐỐI:
    - Xuất trường "lessonTitle" là tên đầy đủ, chính xác của bài học VIẾT IN HOA TOÀN BỘ (Ví dụ môn Công nghệ 4 Bài 3: "BÀI 3: VẬT LIỆU VÀ DỤNG CỤ TRỒNG HOA, CÂY CẢNH TRONG CHẬU").
    - BÁM SÁT 100% MÔN HỌC "${subject}": Toàn bộ câu hỏi phải kiểm tra kiến thức của bài học đó trong môn "${subject}". NGHIÊM CẤM TUYỆT ĐỐI việc sinh câu hỏi lệch sang môn Tin học hay môn Toán khi người dùng đang chọn môn Công nghệ!
 
-2. BẮT BUỘC CÓ TỪ 1 ĐẾN 3 CÂU HỎI NÂNG CAO (difficulty = "nang_cao", isAdvanced = true):
+2. KHÔNG ĐƯỢC LẶP LẠI CÂU HỎI (100% CÂU HỎI PHẢI KHÁC NHAU):
+   - Bộ đề có ${questionCount} câu hỏi thì cả ${questionCount} câu phải hoàn toàn khác nhau, kiểm tra các khía cạnh kiến thức khác nhau từ đầu đến cuối bài học. Tuyệt đối không lặp lại câu hỏi.
+
+3. BẮT BUỘC CÓ TỪ 1 ĐẾN 3 CÂU HỎI NÂNG CAO (difficulty = "nang_cao", isAdvanced = true):
    - Trong bộ ${questionCount} câu hỏi phải có đúng ${targetAdvancedCount} câu hỏi nâng cao / vận dụng thực tế (đặt "difficulty": "nang_cao", "isAdvanced": true).
    - Các câu hỏi nâng cao đặt học sinh vào tình huống thực hành, giải thích "Vì sao...", hoặc vận dụng kiến thức trong bài học vào thực tiễn đời sống.
    - Các câu hỏi còn lại đặt "difficulty": "co_ban", "isAdvanced": false.
 
-3. ƯU TIÊN CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRONG CÂU HỎI HOẶC TRONG CÁC ĐÁP ÁN (HÌNH ẢNH CHỈ HIỂN THỊ 1 TRONG 2):
-   - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan (chiếm 75% - 85% số câu hỏi).
+4. ƯU TIÊN CÁC CÂU HỎI CÓ HÌNH ẢNH MINH HỌA TRONG CÂU HỎI HOẶC TRONG CÁC ĐÁP ÁN (HÌNH ẢNH CHỈ HIỂN THỊ 1 TRONG 2):
+   - Ưu tiên các câu hỏi có hình ảnh minh họa trực quan.
    - Hình ảnh CHỈ ĐƯỢC HIỂN THỊ Ở 1 TRONG 2 NƠI:
      + Chế độ 1 ("visualDisplayMode": "question_image"): Hình ảnh nằm ở câu hỏi -> 4 đáp án A, B, C, D BẮT BUỘC là văn bản thuần túy (optionVisuals = []).
      + Chế độ 2 ("visualDisplayMode": "options_image"): Hình ảnh nằm ở cả 4 đáp án A, B, C, D -> Câu hỏi BẮT BUỘC là văn bản thuần túy (visualKey = "", visualData = "") và optionVisuals có đủ 4 mã hình ảnh cho 4 đáp án.
@@ -104,24 +109,7 @@ ${content ? `- Nội dung / Ghi chú: ${content}` : ''}
 
 Hãy tìm đúng bài học "${lessonTitle}" của môn ${subject} (Khối ${detectedGrade}) trong tài liệu PDF / sách giáo khoa, đọc tất cả nội dung kiến thức trong bài và xuất JSON gồm:
 1. "lessonTitle" đầy đủ viết IN HOA.
-2. "questions": Đúng ${questionCount} câu hỏi trắc nghiệm bám sát 100% bài học môn ${subject}, trong đó có ${targetAdvancedCount} câu hỏi nâng cao ("isAdvanced": true, "difficulty": "nang_cao"), và ưu tiên các câu hỏi có hình ảnh minh họa trong câu hỏi hoặc trong các đáp án (chỉ hiển thị 1 trong 2).`;
-
-      let contentsPayload: any = promptText;
-      if (pdfBase64) {
-        contentsPayload = {
-          parts: [
-            {
-              inlineData: {
-                mimeType: 'application/pdf',
-                data: pdfBase64,
-              },
-            },
-            {
-              text: promptText,
-            },
-          ],
-        };
-      }
+2. "questions": Đúng ${questionCount} câu hỏi trắc nghiệm KHÁC NHAU HOÀN TOÀN (không lặp lại câu hỏi), bám sát 100% bài học môn ${subject}, trong đó có ${targetAdvancedCount} câu hỏi nâng cao ("isAdvanced": true, "difficulty": "nang_cao"), và ưu tiên các câu hỏi có hình ảnh minh họa trong câu hỏi hoặc trong các đáp án (chỉ hiển thị 1 trong 2).`;
 
       const responseSchema = {
         type: Type.OBJECT,
@@ -173,37 +161,70 @@ Hãy tìm đúng bài học "${lessonTitle}" của môn ${subject} (Khối ${det
         required: ['lessonTitle', 'questions'],
       };
 
-      let lastError: any = null;
-      for (const modelName of GEMINI_MODEL_CHAIN) {
-        try {
-          const response = await ai.models.generateContent({
-            model: modelName,
-            contents: contentsPayload,
-            config: {
-              systemInstruction,
-              responseMimeType: 'application/json',
-              responseSchema,
-            },
-          });
+      const callModelChain = async (usePdfInline: boolean) => {
+        const contentsPayload: any =
+          usePdfInline && pdfBase64
+            ? {
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType: 'application/pdf',
+                      data: pdfBase64,
+                    },
+                  },
+                  {
+                    text: promptText,
+                  },
+                ],
+              }
+            : promptText;
 
-          const responseText = response.text || '{}';
-          const parsedData = JSON.parse(responseText);
-          if (parsedData && Array.isArray(parsedData.questions) && parsedData.questions.length > 0) {
-            parsedData.lessonTitle = String(parsedData.lessonTitle || lessonTitle || '')
-              .trim()
-              .toUpperCase();
-            return res.json({
-              success: true,
-              data: parsedData,
+        let lastErr: any = null;
+        for (const modelName of STABLE_GEMINI_MODELS) {
+          try {
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: contentsPayload,
+              config: {
+                systemInstruction,
+                responseMimeType: 'application/json',
+                responseSchema,
+              },
             });
+
+            const responseText = response.text || '{}';
+            const parsedData = JSON.parse(responseText);
+            if (parsedData && Array.isArray(parsedData.questions) && parsedData.questions.length > 0) {
+              parsedData.lessonTitle = String(parsedData.lessonTitle || lessonTitle || '')
+                .trim()
+                .toUpperCase();
+              return parsedData;
+            }
+          } catch (err) {
+            lastErr = err;
+            console.warn(`Server Gemini model ${modelName} (usePdf=${usePdfInline}) failed:`, err);
           }
-        } catch (err) {
-          lastError = err;
-          console.warn(`Server Gemini model ${modelName} failed, trying next:`, err);
+        }
+        throw lastErr || new Error('All Gemini models failed');
+      };
+
+      let parsedData: any;
+      try {
+        // Nếu file PDF quá lớn (>18MB base64 vượt ngưỡng 20MB inlineData của Google REST API) thì chuyển sang đọc theo chương trình chuẩn
+        const canSendPdfInline = Boolean(pdfBase64 && pdfBase64.length <= 18_500_000);
+        parsedData = await callModelChain(canSendPdfInline);
+      } catch (pdfErr) {
+        if (pdfBase64) {
+          parsedData = await callModelChain(false);
+        } else {
+          throw pdfErr;
         }
       }
 
-      throw lastError || new Error('All Gemini models failed');
+      return res.json({
+        success: true,
+        data: parsedData,
+      });
     } catch (error: any) {
       console.error('Gemini API extraction error:', error);
       res.status(500).json({
