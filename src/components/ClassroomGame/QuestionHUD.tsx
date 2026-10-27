@@ -40,6 +40,18 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   const [timeLeft, setTimeLeft] = useState(totalTime);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [isSpeakingText, setIsSpeakingText] = useState(false);
+  const [speechRate, setSpeechRate] = useState<number>(() => sound.getSpeechRate());
+
+  const handleChangeSpeechRate = (newRate: number) => {
+    sound.setSpeechRate(newRate);
+    setSpeechRate(newRate);
+    if (isQuestionStarted) {
+      sound.speakQuestionAndOptions(questionNumber, question.question, question.options, {
+        onStart: () => setIsSpeakingText(true),
+        onEnd: () => setIsSpeakingText(false),
+      });
+    }
+  };
 
   const answeredRef = React.useRef(false);
   const startTimeRef = React.useRef<number>(Date.now());
@@ -381,29 +393,55 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             )}
           </div>
 
-          {/* Nút Đọc Văn Bản Câu Hỏi & 4 Đáp Án */}
-          <button
-            type="button"
-            onClick={handleReadFullQuestionAndOptions}
-            title="Máy đọc to, rõ ràng câu hỏi và 4 đáp án (chuẩn cả tiếng Việt và tiếng Anh)"
-            className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow border ${
-              isSpeakingText
-                ? 'bg-emerald-500 text-slate-950 border-white animate-pulse'
-                : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400'
-            }`}
-          >
-            {isSpeakingText ? (
-              <>
-                <Volume2 className="w-4 h-4 animate-bounce" />
-                <span>Đang đọc văn bản... (Bấm để dừng)</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-4 h-4" />
-                <span>{isQuestionStarted ? 'Đọc lại câu hỏi & đáp án' : 'Bắt đầu & Đọc câu hỏi'}</span>
-              </>
-            )}
-          </button>
+          {/* Tốc độ đọc (Rất chậm 0.62x • Chậm rõ 0.72x • Vừa 0.82x) + Nút Đọc Văn Bản Câu Hỏi & 4 Đáp Án */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <div
+              title="Tùy chỉnh tốc độ đọc giọng nói (Mặc định: Chậm rõ 0.72x, Âm lượng tối đa 100%)"
+              className="flex items-center bg-slate-900 border border-slate-700 rounded-xl p-0.5 text-[10px] font-black"
+            >
+              {[
+                { label: 'Rất chậm', rate: 0.62 },
+                { label: 'Chậm rõ', rate: 0.72 },
+                { label: 'Vừa', rate: 0.82 },
+              ].map((item) => (
+                <button
+                  key={item.rate}
+                  type="button"
+                  onClick={() => handleChangeSpeechRate(item.rate)}
+                  className={`px-2 py-0.5 rounded-lg transition-all cursor-pointer ${
+                    Math.abs(speechRate - item.rate) < 0.03
+                      ? 'bg-amber-400 text-slate-950 shadow'
+                      : 'text-slate-300 hover:text-white'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleReadFullQuestionAndOptions}
+              title="Máy đọc to, chậm rãi, rõ ràng câu hỏi và 4 đáp án (chuẩn cả tiếng Việt và tiếng Anh)"
+              className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow border ${
+                isSpeakingText
+                  ? 'bg-emerald-500 text-slate-950 border-white animate-pulse'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400'
+              }`}
+            >
+              {isSpeakingText ? (
+                <>
+                  <Volume2 className="w-4 h-4 animate-bounce" />
+                  <span>Đang đọc... (Dừng)</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-4 h-4" />
+                  <span>{isQuestionStarted ? 'Đọc lại' : 'Bắt đầu & Đọc'}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         <h2
