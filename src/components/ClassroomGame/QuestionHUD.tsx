@@ -7,7 +7,7 @@ import {
   resolveVisualDisplayMode,
 } from './QuestionVisualIllustration';
 import { sound } from '../../services/soundService';
-import { Timer, Flame, Clock, Shuffle, Volume2, VolumeX } from 'lucide-react';
+import { Timer, Flame, Clock, Shuffle, Volume2, Play, PauseCircle } from 'lucide-react';
 
 interface QuestionHUDProps {
   question: Question;
@@ -32,8 +32,11 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   onAnswer,
   combo,
 }) => {
-  // Thời gian 1 câu hỏi là 1 phút (60 giây) để học sinh thoải mái đọc/nghe kỹ câu hỏi và 4 đáp án
+  // Thời gian 1 câu hỏi là 1 phút (60 giây)
+  // KHI HIỂN THỊ CÂU HỎI: Ứng dụng dừng lại (chưa đọc âm thanh, chưa tính thời gian) để giáo viên gọi tên học sinh.
+  // Chỉ khi bấm nút "BẮT ĐẦU" thì ứng dụng mới bắt đầu đọc âm thanh câu hỏi & đáp án và mới bắt đầu tính giây!
   const totalTime = 60;
+  const [isQuestionStarted, setIsQuestionStarted] = useState(false);
   const [timeLeft, setTimeLeft] = useState(totalTime);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [isSpeakingText, setIsSpeakingText] = useState(false);
@@ -43,11 +46,25 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   const onAnswerRef = React.useRef(onAnswer);
   onAnswerRef.current = onAnswer;
 
-  // Tự động đọc to, rõ ràng, tốc độ trung bình toàn bộ văn bản Câu hỏi và 4 Đáp án A, B, C, D ngay khi hiển thị câu hỏi
+  // Khi chuyển sang câu hỏi mới: Đặt lại trạng thái DỪNG CHỜ BẤM "BẮT ĐẦU"
   useEffect(() => {
     answeredRef.current = false;
+    setIsQuestionStarted(false);
     setTimeLeft(totalTime);
     setElapsedSec(0);
+    setIsSpeakingText(false);
+    sound.stopSpeech();
+
+    return () => {
+      sound.stopSpeech();
+      setIsSpeakingText(false);
+    };
+  }, [question.id, questionNumber]);
+
+  // Chỉ khi người dùng bấm nút "BẮT ĐẦU" (isQuestionStarted === true) thì mới đọc âm thanh và tính thời gian (giây)
+  useEffect(() => {
+    if (!isQuestionStarted) return;
+
     startTimeRef.current = Date.now();
 
     const speechTimer = setTimeout(() => {
@@ -55,7 +72,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         onStart: () => setIsSpeakingText(true),
         onEnd: () => setIsSpeakingText(false),
       });
-    }, 180);
+    }, 100);
 
     const countdownInterval = setInterval(() => {
       setTimeLeft((prev) => Math.max(0, prev - 1));
@@ -70,13 +87,11 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
       clearTimeout(speechTimer);
       clearInterval(countdownInterval);
       clearInterval(stopwatchInterval);
-      sound.stopSpeech();
-      setIsSpeakingText(false);
     };
-  }, [question.id, questionNumber]);
+  }, [isQuestionStarted, question.id, questionNumber]);
 
   useEffect(() => {
-    if (timeLeft === 0 && !answeredRef.current) {
+    if (isQuestionStarted && timeLeft === 0 && !answeredRef.current) {
       answeredRef.current = true;
       sound.stopSpeech();
       const timeoutTimer = setTimeout(() => {
@@ -84,10 +99,22 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
       }, 0);
       return () => clearTimeout(timeoutTimer);
     }
-  }, [timeLeft]);
+  }, [isQuestionStarted, timeLeft]);
+
+  const handleStartQuestion = () => {
+    if (isQuestionStarted) return;
+    sound.playClick();
+    startTimeRef.current = Date.now();
+    setIsQuestionStarted(true);
+  };
 
   const handleSelectAnswer = (optionIndex: number) => {
     if (answeredRef.current) return;
+    // Nếu giáo viên/học sinh chưa bấm "BẮT ĐẦU" thì nhắc bấm "BẮT ĐẦU" trước để bắt đầu tính giây công bằng
+    if (!isQuestionStarted) {
+      handleStartQuestion();
+      return;
+    }
     answeredRef.current = true;
     sound.stopSpeech();
     setIsSpeakingText(false);
@@ -97,6 +124,10 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   };
 
   const handleReadFullQuestionAndOptions = () => {
+    if (!isQuestionStarted) {
+      handleStartQuestion();
+      return;
+    }
     if (isSpeakingText) {
       sound.stopSpeech();
       setIsSpeakingText(false);
@@ -110,6 +141,10 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
 
   const handleReadSingleOption = (e: React.MouseEvent, optLabel: string, optText: string) => {
     e.stopPropagation();
+    if (!isQuestionStarted) {
+      handleStartQuestion();
+      return;
+    }
     sound.speakVietnameseText(`Đáp án ${optLabel}: ${optText}`, {
       interrupt: true,
       onStart: () => setIsSpeakingText(true),
@@ -119,6 +154,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isQuestionStarted) return;
       if (['1', 'a', 'A'].includes(e.key)) handleSelectAnswer(0);
       if (['2', 'b', 'B'].includes(e.key)) handleSelectAnswer(1);
       if (['3', 'c', 'C'].includes(e.key)) handleSelectAnswer(2);
@@ -126,7 +162,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isQuestionStarted]);
 
   const optionColors = [
     {
@@ -176,12 +212,24 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
 
             {/* Đồng hồ bấm giây tính tốc độ trả lời để phân định thắng thua khi ngang điểm */}
             <div
-              title="Số giây trả lời câu hỏi này (dùng để phân định người thắng cuộc khi ngang điểm)"
-              className="bg-emerald-950/90 px-2.5 py-1 rounded-lg border border-emerald-500/60 flex items-center gap-1 text-xs"
+              title="Số giây trả lời câu hỏi này (chỉ bắt đầu tính sau khi bấm nút BẮT ĐẦU)"
+              className={`px-2.5 py-1 rounded-lg border flex items-center gap-1 text-xs ${
+                isQuestionStarted
+                  ? 'bg-emerald-950/90 border-emerald-500/60'
+                  : 'bg-slate-800/90 border-slate-600'
+              }`}
             >
-              <Clock className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-              <span className="font-mono font-black text-emerald-300">
-                {elapsedSec.toFixed(1)}s
+              <Clock
+                className={`w-3.5 h-3.5 ${
+                  isQuestionStarted ? 'text-emerald-400 animate-pulse' : 'text-slate-400'
+                }`}
+              />
+              <span
+                className={`font-mono font-black ${
+                  isQuestionStarted ? 'text-emerald-300' : 'text-slate-300'
+                }`}
+              >
+                {isQuestionStarted ? `${elapsedSec.toFixed(1)}s` : 'Chờ Bắt Đầu'}
               </span>
             </div>
 
@@ -202,12 +250,20 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
           >
             <Timer
               className={`w-4 h-4 ${
-                timeLeft <= 10 ? 'text-rose-400 animate-spin' : 'text-amber-400'
+                !isQuestionStarted
+                  ? 'text-slate-400'
+                  : timeLeft <= 10
+                  ? 'text-rose-400 animate-spin'
+                  : 'text-amber-400'
               }`}
             />
             <span
               className={`font-mono text-xs sm:text-sm font-black ${
-                timeLeft <= 10 ? 'text-rose-400 animate-pulse' : 'text-amber-300'
+                !isQuestionStarted
+                  ? 'text-slate-300'
+                  : timeLeft <= 10
+                  ? 'text-rose-400 animate-pulse'
+                  : 'text-amber-300'
               }`}
             >
               {timeLeft}s / 60s
@@ -219,7 +275,9 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-1000 ease-linear rounded-full ${
-              timeLeft <= 10
+              !isQuestionStarted
+                ? 'bg-slate-600'
+                : timeLeft <= 10
                 ? 'bg-rose-500'
                 : 'bg-gradient-to-r from-amber-400 via-orange-400 to-emerald-400'
             }`}
@@ -227,13 +285,13 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
           />
         </div>
 
-        {/* Active Student Full Name Display (Khi bắt được học sinh nào thì chỉ hiển thị rõ Họ và Tên học sinh) */}
+        {/* Active Student Full Name Display */}
         <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl p-2">
           <div
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shrink-0 shadow font-black text-slate-950 ring-1 ring-white/20"
             style={{ backgroundColor: activeRacer?.colorHex || '#f59e0b' }}
           >
-            {activeRacer?.avatar || '🦁'}
+            {activeRacer?.avatar || '🦆'}
           </div>
           <div className="min-w-0 flex-1">
             {lessonTitle && (
@@ -244,7 +302,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             {selectedStudentName ? (
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow">
-                  <span>🐥 {selectedStudentName}</span>
+                  <span>🦆 {selectedStudentName}</span>
                 </span>
                 <span className="text-xs font-extrabold text-white truncate">
                   ({activeRacer?.name} • Móc {currentHook}/10 • {activeRacer?.score || 0}đ • ✅{' '}
@@ -259,16 +317,51 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
               </div>
             ) : (
               <div className="text-xs font-bold text-amber-300 leading-snug">
-                Chưa gọi tên học sinh — Hãy bấm{' '}
-                <span className="underline font-black">"Bắt đầu bắt gà gọi tên"</span> ở khung bên
-                phải!
+                Bước 1: Bấm <span className="underline font-black">"Gọi tên (Đua vịt 3D)"</span> ở
+                bên phải để chọn học sinh trước khi bấm BẮT ĐẦU!
               </div>
             )}
           </div>
         </div>
+
+        {/* NÚT "BẮT ĐẦU" ĐỌC ÂM THANH & BẮT ĐẦU TÍNH THỜI GIAN (GIÂY) */}
+        {!isQuestionStarted ? (
+          <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-indigo-950 border-2 border-emerald-400 rounded-2xl p-2.5 sm:p-3 shadow-[0_0_25px_rgba(16,185,129,0.3)] flex flex-col sm:flex-row items-center justify-between gap-2 animate-in fade-in duration-200">
+            <div className="flex items-center gap-2 text-left">
+              <PauseCircle className="w-5 h-5 text-amber-300 shrink-0 animate-pulse" />
+              <div className="text-xs leading-snug">
+                <div className="font-black text-amber-300 uppercase">
+                  Đang tạm dừng để gọi tên học sinh
+                </div>
+                <div className="text-emerald-100 font-semibold text-[11px]">
+                  Sau khi đua vịt gọi xong học sinh, bấm <strong className="text-white">BẮT ĐẦU</strong> để máy đọc câu hỏi và tính giây!
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleStartQuestion}
+              className="w-full sm:w-auto shrink-0 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-400 via-teal-300 to-amber-300 hover:from-emerald-300 hover:to-amber-200 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-1.5 cursor-pointer transition-transform active:scale-95 border-2 border-white"
+            >
+              <Play className="w-4 h-4 fill-slate-950" />
+              <span>BẮT ĐẦU (ĐỌC & TÍNH GIỜ)</span>
+            </button>
+          </div>
+        ) : (
+          <div className="bg-emerald-950/75 border border-emerald-500/50 rounded-xl px-3 py-1.5 flex items-center justify-between gap-2 text-xs">
+            <span className="font-black text-emerald-300 flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              Đã bắt đầu tính thời gian ({elapsedSec.toFixed(1)}s) & đọc âm thanh!
+            </span>
+            <span className="text-[11px] font-bold text-amber-300">
+              Chọn đáp án A, B, C hoặc D
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* 2. Question Content Area (Cỡ chữ lớn, rõ ràng + Tự động đọc văn bản + Nút nghe đọc lại) */}
+      {/* 2. Question Content Area (Cỡ chữ lớn, rõ ràng + Đọc văn bản chuẩn tiếng Việt & tiếng Anh) */}
       <div
         className={`flex flex-col gap-2 bg-slate-950/85 border-2 ${
           question.isAdvanced || question.difficulty === 'nang_cao'
@@ -288,11 +381,11 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             )}
           </div>
 
-          {/* Nút Đọc Văn Bản Câu Hỏi & 4 Đáp Án (Giọng đọc to, rõ ràng, tốc độ trung bình) */}
+          {/* Nút Đọc Văn Bản Câu Hỏi & 4 Đáp Án */}
           <button
             type="button"
             onClick={handleReadFullQuestionAndOptions}
-            title="Máy tự động đọc to, rõ ràng câu hỏi và 4 đáp án (tốc độ trung bình)"
+            title="Máy đọc to, rõ ràng câu hỏi và 4 đáp án (chuẩn cả tiếng Việt và tiếng Anh)"
             className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow border ${
               isSpeakingText
                 ? 'bg-emerald-500 text-slate-950 border-white animate-pulse'
@@ -307,21 +400,25 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             ) : (
               <>
                 <Volume2 className="w-4 h-4" />
-                <span>Đọc câu hỏi & đáp án</span>
+                <span>{isQuestionStarted ? 'Đọc lại câu hỏi & đáp án' : 'Bắt đầu & Đọc câu hỏi'}</span>
               </>
             )}
           </button>
         </div>
 
         <h2
-          onClick={() =>
+          onClick={() => {
+            if (!isQuestionStarted) {
+              handleStartQuestion();
+              return;
+            }
             sound.speakVietnameseText(`Câu hỏi số ${questionNumber}: ${question.question}`, {
               interrupt: true,
               onStart: () => setIsSpeakingText(true),
               onEnd: () => setIsSpeakingText(false),
-            })
-          }
-          title="Bấm vào văn bản câu hỏi để nghe máy đọc lại câu hỏi"
+            });
+          }}
+          title="Bấm vào văn bản câu hỏi để nghe máy đọc câu hỏi"
           className="text-base sm:text-lg xl:text-xl font-black text-white leading-snug break-words cursor-pointer hover:text-amber-200 transition-colors"
         >
           {question.question}
@@ -334,10 +431,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         )}
       </div>
 
-      {/* 3. Các Đáp Án A, B, C, D Đặt Dọc Từ Trên Xuống Ở Cột Trái 1/3:
-          - Tăng cỡ chữ nội dung đáp án (text-sm sm:text-base xl:text-lg)
-          - Không cắt chữ (không dùng line-clamp), hiển thị đầy đủ các đáp án dài từ trên xuống dưới
-          - Có nút loa đọc riêng từng đáp án để học sinh không cần phải tự đọc */}
+      {/* 3. Các Đáp Án A, B, C, D Đặt Dọc Từ Trên Xuống Ở Cột Trái 1/3 */}
       <div
         className={`flex-1 flex flex-col justify-between ${
           uniformOptionVisuals ? 'grid grid-cols-2 gap-2' : 'gap-2 sm:gap-2.5'
@@ -357,7 +451,9 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
                   handleSelectAnswer(idx);
                 }
               }}
-              className={`group w-full flex flex-col justify-center gap-1.5 p-2.5 sm:p-3.5 rounded-2xl ${col.bg} border-2 ${col.border} text-white font-bold text-left transition-all active:scale-[0.98] shadow-lg cursor-pointer`}
+              className={`group w-full flex flex-col justify-center gap-1.5 p-2.5 sm:p-3.5 rounded-2xl ${col.bg} border-2 ${col.border} text-white font-bold text-left transition-all active:scale-[0.98] shadow-lg cursor-pointer ${
+                !isQuestionStarted ? 'opacity-80 ring-1 ring-white/20' : ''
+              }`}
             >
               {uniformOptionVisuals && (
                 <OptionVisualIllustration

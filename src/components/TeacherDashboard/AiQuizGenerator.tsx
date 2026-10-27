@@ -9,6 +9,7 @@ import {
   getUniformOptionVisuals,
   resolveVisualDisplayMode,
 } from '../ClassroomGame/QuestionVisualIllustration';
+import { sound } from '../../services/soundService';
 import {
   Sparkles,
   Upload,
@@ -17,6 +18,7 @@ import {
   BookOpen,
   HelpCircle,
   Settings,
+  Volume2,
 } from 'lucide-react';
 
 export const AiQuizGenerator: React.FC = () => {

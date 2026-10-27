@@ -332,9 +332,9 @@ export const ClassroomGameView: React.FC = () => {
           )}
         </div>
 
-        {/* CỘT BÊN PHẢI 2/3: PHÍA TRÊN LÀ BÀ CỤ CHỐNG GẬY BẮT GÀ GỌI TÊN • PHÍA DƯỚI LÀ CÁC MÓC CUỘC CHƠI */}
+        {/* CỘT BÊN PHẢI 2/3: PHÍA TRÊN LÀ ĐUA VỊT 3D GỌI TÊN HỌC SINH • PHÍA DƯỚI LÀ CÁC MÓC CUỘC CHƠI */}
         <div className="w-full lg:w-[65%] xl:w-[66%] lg:h-full flex-1 flex flex-col gap-2.5 min-w-0 min-h-0 overflow-hidden">
-          {/* PHÍA TRÊN: BÀ CỤ CHỐNG GẬY BẮT GÀ GỌI TÊN HỌC SINH */}
+          {/* PHÍA TRÊN: ĐUA VỊT 3D GỌI TÊN HỌC SINH */}
           <div className="w-full h-[250px] sm:h-[270px] lg:h-[45%] shrink-0 overflow-hidden">
             <ChickPickerArena
               gameMode={gameMode}
@@ -364,16 +364,16 @@ export const ClassroomGameView: React.FC = () => {
         {gameState === 'idle' && (
           <div className="absolute inset-0 z-30 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3">
             <div className="bg-slate-900/95 border-2 border-amber-400 rounded-3xl p-5 sm:p-7 max-w-lg text-center text-white shadow-2xl animate-in zoom-in-95 duration-200">
-              <div className="text-3xl mb-1">👵🦯🐥 🌳🦁🧗</div>
+              <div className="text-3xl mb-1">🦆🌊🏁 🌳🦁🧗</div>
               <div className="text-xs font-black text-amber-400 uppercase tracking-wider mb-1">
                 {displayLessonTitle}
               </div>
               <h3 className="text-lg sm:text-xl font-black mb-1.5 text-white">
-                BÀ CỤ CHỐNG GẬY BẮT GÀ & RỪNG CỔ THỤ 10 MÓC!
+                ĐUA VỊT 3D GỌI TÊN & RỪNG CỔ THỤ 10 MÓC!
               </h3>
               <p className="text-slate-300 text-xs mb-4 leading-relaxed text-left">
-                • <strong>Bên trái 1/3 từ trên xuống:</strong> Nội dung câu hỏi và 4 đáp án A, B, C, D với cỡ chữ lớn, rõ ràng và thời gian suy nghĩ <strong>1 phút (60 giây)</strong> mỗi câu.
-                <br />• <strong>Bên phải phía trên:</strong> Bà cụ chống gậy (chỉ cầm cây gậy) nhảy tới bắt các chú gà con di chuyển chậm rãi (có thể bắt trúng hoặc trật chú gà, chỉ gọi tên sau khi bấm bắt đầu bắt gà).
+                • <strong>Bên trái 1/3 từ trên xuống:</strong> Khi hiện câu hỏi, ứng dụng tạm dừng để giáo viên gọi tên học sinh. Sau khi gọi xong học sinh, bấm nút <strong>"BẮT ĐẦU"</strong> để máy đọc câu hỏi (chuẩn tiếng Việt & tiếng Anh) và bắt đầu tính thời gian (60 giây).
+                <br />• <strong>Bên phải phía trên:</strong> Trò chơi <strong>Đua Vịt 3D Gọi Tên Học Sinh</strong> trên mặt hồ 3D nhiều màu sắc. Chú vịt 3D nào bơi về đích trước sẽ được chọn và vang lên âm thanh <strong>"Mời bạn + Họ và tên học sinh"</strong>.
                 <br />• <strong>Bên phải phía dưới:</strong> Khu vực các MÓC cuộc chơi của{' '}
                 <strong className="text-amber-400">
                   {gameMode === 'individual' ? `${racers.length} cá nhân` : `${racers.length} đội nhóm`}
