@@ -23,6 +23,7 @@ class SoundSynthesizer {
     this.isMuted = !this.isMuted;
     if (this.isMuted) {
       this.stopCelebrationMusic();
+      this.stopSpeech();
     }
     return this.isMuted;
   }
@@ -33,6 +34,152 @@ class SoundSynthesizer {
 
   public isCelebrationMusicPlaying(): boolean {
     return this.isBgmPlaying && !this.isMuted;
+  }
+
+  /**
+   * Chuẩn hóa văn bản tiếng Việt trước khi đọc để giọng đọc rõ ràng, mạch lạc, không đọc nhầm ký hiệu
+   */
+  private normalizeVietnameseSpeechText(rawText: string): string {
+    if (!rawText) return '';
+    return String(rawText)
+      .replace(/(\p{Emoji_Presentation}|\p{Extended_Pictographic})/gu, ' ')
+      .replace(/(\d+)\s*[×x*]\s*(\d+)/gi, '$1 nhân $2')
+      .replace(/(\d+)\s*[:÷/]\s*(\d+)/g, '$1 chia $2')
+      .replace(/(\d+)\s*\+\s*(\d+)/g, '$1 cộng $2')
+      .replace(/(\d+)\s*-\s*(\d+)/g, '$1 trừ $2')
+      .replace(/=\s*\?/g, 'bằng bao nhiêu')
+      .replace(/=/g, ' bằng ')
+      .replace(/\bSGK\b/gi, 'sách giáo khoa')
+      .replace(/\bVD\b/gi, 'ví dụ')
+      .replace(/\bHS\b/gi, 'học sinh')
+      .replace(/\bGV\b/gi, 'giáo viên')
+      .replace(/\bCPU\b/gi, 'Cờ Pê U')
+      .replace(/\bUSB\b/gi, 'U Ét Bê')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Chọn giọng đọc Tiếng Việt (vi-VN) rõ ràng nhất có trên thiết bị/trình duyệt
+   */
+  private getBestVietnameseVoice(): SpeechSynthesisVoice | null {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices || voices.length === 0) return null;
+
+    const viVoices = voices.filter(
+      (v) =>
+        v.lang.toLowerCase().startsWith('vi') ||
+        v.name.toLowerCase().includes('vietnam') ||
+        v.name.toLowerCase().includes('tiếng việt') ||
+        v.name.toLowerCase().includes('hoaimy') ||
+        v.name.toLowerCase().includes('namminh')
+    );
+
+    if (viVoices.length === 0) return null;
+
+    // Ưu tiên giọng Google Tiếng Việt hoặc Microsoft HoaiMy / Natural
+    const preferred =
+      viVoices.find((v) => v.name.toLowerCase().includes('natural')) ||
+      viVoices.find((v) => v.name.toLowerCase().includes('google')) ||
+      viVoices.find((v) => v.name.toLowerCase().includes('hoaimy')) ||
+      viVoices[0];
+
+    return preferred || null;
+  }
+
+  /**
+   * Dừng đọc văn bản hiện tại
+   */
+  public stopSpeech(): void {
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    } catch {}
+  }
+
+  /**
+   * Đọc to, rõ ràng một đoạn văn bản tiếng Việt với tốc độ trung bình (rate = 0.88, không quá nhanh, âm lượng tối đa 1.0)
+   */
+  public speakVietnameseText(
+    text: string,
+    options?: {
+      onStart?: () => void;
+      onEnd?: () => void;
+      interrupt?: boolean;
+    }
+  ): void {
+    if (this.isMuted) {
+      options?.onEnd?.();
+      return;
+    }
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      options?.onEnd?.();
+      return;
+    }
+
+    const clean = this.normalizeVietnameseSpeechText(text);
+    if (!clean) {
+      options?.onEnd?.();
+      return;
+    }
+
+    try {
+      if (options?.interrupt !== false) {
+        window.speechSynthesis.cancel();
+      }
+
+      const utterance = new SpeechSynthesisUtterance(clean);
+      utterance.lang = 'vi-VN';
+      utterance.volume = 1.0; // Âm lượng TO tối đa (100%)
+      utterance.rate = 0.88; // Tốc độ đọc TRUNG BÌNH, rõ chữ, không quá nhanh
+      utterance.pitch = 1.0;
+
+      const bestVoice = this.getBestVietnameseVoice();
+      if (bestVoice) {
+        utterance.voice = bestVoice;
+      }
+
+      if (options?.onStart) {
+        utterance.onstart = () => options.onStart?.();
+      }
+      if (options?.onEnd) {
+        utterance.onend = () => options.onEnd?.();
+        utterance.onerror = () => options.onEnd?.();
+      }
+
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      options?.onEnd?.();
+    }
+  }
+
+  /**
+   * Tự động đọc trọn vẹn Câu hỏi và 4 Đáp án A, B, C, D rõ ràng, to, tốc độ trung bình để học sinh không cần phải tự đọc
+   */
+  public speakQuestionAndOptions(
+    questionNumber: number | undefined,
+    questionText: string,
+    optionsList: string[],
+    callbacks?: {
+      onStart?: () => void;
+      onEnd?: () => void;
+    }
+  ): void {
+    const prefix = questionNumber ? `Câu hỏi số ${questionNumber}: ` : 'Câu hỏi: ';
+    const labels = ['A', 'B', 'C', 'D'];
+    const optionsNarration = (optionsList || [])
+      .slice(0, 4)
+      .map((opt, idx) => `Đáp án ${labels[idx]}: ${opt}.`)
+      .join(' ');
+
+    const fullScript = `${prefix}${questionText}. ${optionsNarration}`;
+    this.speakVietnameseText(fullScript, {
+      interrupt: true,
+      onStart: callbacks?.onStart,
+      onEnd: callbacks?.onEnd,
+    });
   }
 
   // Tiếng động cơ / xuất phát hào hứng

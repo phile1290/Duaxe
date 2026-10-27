@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GameMode, Racer, Student } from '../../types';
 import { sound } from '../../services/soundService';
 import { normalizeEntityKey } from '../../services/classroomStorageService';
-import { Sparkles, Users, UserCheck, Volume2, Shuffle } from 'lucide-react';
+import { Sparkles, Users, Shuffle } from 'lucide-react';
 
 interface ChickPickerArenaProps {
   students: Student[];
@@ -21,8 +21,8 @@ interface WanderingChick {
   teamName: string;
   racerIndex: number;
   colorHex: string;
-  x: number; // percentage 12..86
-  y: number; // percentage 26..80
+  x: number; // percentage 14..86
+  y: number; // percentage 28..78
   vx: number;
   vy: number;
   facingLeft: boolean;
@@ -46,8 +46,8 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
   const [jumpStatus, setJumpStatus] = useState<JumpStatus>('idle');
   const [statusBannerText, setStatusBannerText] = useState<string | null>(null);
   const [grandmaPos, setGrandmaPos] = useState<{ x: number; y: number; facingLeft: boolean }>({
-    x: 15,
-    y: 52,
+    x: 14,
+    y: 54,
     facingLeft: false,
   });
   const [highlightedChickId, setHighlightedChickId] = useState<string | null>(null);
@@ -74,7 +74,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
           racerIndex: rIdx,
           colorHex: r.colorHex,
           x: 24 + ((rIdx * 17) % 60),
-          y: 30 + ((rIdx * 23) % 46),
+          y: 32 + ((rIdx * 23) % 44),
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           facingLeft: rIdx % 2 === 0,
@@ -103,7 +103,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
             racerIndex: rIdx,
             colorHex: r.colorHex,
             x: 22 + ((seed * 19) % 62),
-            y: 28 + ((seed * 29) % 48),
+            y: 30 + ((seed * 29) % 46),
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
             facingLeft: seed % 2 === 1,
@@ -124,7 +124,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
       setHighlightedChickId(null);
       setJumpStatus('idle');
       setStatusBannerText(null);
-      setGrandmaPos({ x: 15, y: 52, facingLeft: false });
+      setGrandmaPos({ x: 14, y: 54, facingLeft: false });
       return;
     }
     const found = chicksRef.current.find(
@@ -133,6 +133,8 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
     if (found) {
       setCaughtChick(found);
       setHighlightedChickId(found.id);
+      setJumpStatus('caught');
+      setStatusBannerText(null); // Khi đã bắt được HS thì KHÔNG hiện thông báo bà lão để không che mất họ và tên HS
     }
   }, [selectedStudentName]);
 
@@ -141,7 +143,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
     const interval = setInterval(() => {
       setChicks((prev) =>
         prev.map((c) => {
-          // Nếu chú gà này đã bị Bà cụ bắt trúng thì đứng yên bên Bà cụ
+          // Nếu chú gà này đã được bắt trúng thì đứng yên để hiển thị rõ Họ và Tên HS
           if (caughtChick && c.id === caughtChick.id && !isCatching) {
             return c;
           }
@@ -159,11 +161,11 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
             nvx = -Math.abs(nvx);
           }
 
-          if (ny < 26) {
-            ny = 26;
+          if (ny < 28) {
+            ny = 28;
             nvy = Math.abs(nvy);
-          } else if (ny > 80) {
-            ny = 80;
+          } else if (ny > 78) {
+            ny = 78;
             nvy = -Math.abs(nvy);
           }
 
@@ -193,9 +195,21 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
     return () => clearInterval(interval);
   }, [caughtChick, isCatching]);
 
+  // Tính vị trí đứng của Bà lão sao cho đứng cạnh bên nhưng KHÔNG BAO GIỜ che mất Họ và Tên của học sinh được bắt
+  const getNonOverlappingGrandmaPos = (chickX: number, chickY: number) => {
+    const placeOnLeft = chickX >= 32;
+    const safeX = placeOnLeft ? Math.max(12, chickX - 16) : Math.min(86, chickX + 16);
+    const safeY = Math.min(78, Math.max(36, chickY + 6));
+    return {
+      x: safeX,
+      y: safeY,
+      facingLeft: !placeOnLeft,
+    };
+  };
+
   // Bà cụ chống gậy nhảy tới bắt gà:
   // - Bà cụ nhảy tới chụp chú gà, CÓ THỂ BẮT TRÚNG HOẶC BẮT TRẬT (HỤT) chú gà!
-  // - Nếu nhảy chụp trật (chú gà nhanh chân né kịp), Bà cụ sẽ báo "Ôi trật chú gà rồi!" và lấy đà nhảy chụp tiếp cho đến khi bắt trúng!
+  // - Khi bắt được học sinh nào thì KHÔNG hiện thông báo bà lão mà CHỈ hiển thị Họ và Tên học sinh rõ ràng!
   const handleStartCatchChick = () => {
     if (isCatching || chicksRef.current.length === 0) return;
 
@@ -203,10 +217,10 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
     setCaughtChick(null);
     setHighlightedChickId(null);
     setJumpStatus('jumping');
-    setStatusBannerText('🦘 Bà cụ chống gậy đang lấy đà nhảy tới bắt gà...');
+    setStatusBannerText('🦘 Đang nhảy bắt gà...');
     sound.playClick();
 
-    // Quyết định số lần nhảy chụp trật trước khi bắt trúng (0, 1 hoặc 2 lần nhảy trật để tạo kịch tính "có thể trúng hay trật chú gà")
+    // Quyết định số lần nhảy chụp trật trước khi bắt trúng (0, 1 hoặc 2 lần nhảy trật)
     const missCount =
       chicksRef.current.length > 1
         ? Math.random() < 0.65
@@ -223,6 +237,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
       if (currentPool.length === 0) {
         setIsCatching(false);
         setJumpStatus('idle');
+        setStatusBannerText(null);
         return;
       }
 
@@ -231,10 +246,10 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
 
       // Bà cụ nhảy bật lên không trung hướng tới vị trí chú gà
       setJumpStatus('jumping');
-      setStatusBannerText(`🦘 Bà cụ nhảy tới chụp chú gà "${targetChick.name}"...`);
+      setStatusBannerText(null);
       setGrandmaPos((prev) => ({
-        x: Math.max(12, Math.min(82, targetChick.x - 5)),
-        y: Math.max(24, Math.min(76, targetChick.y - 3)),
+        x: Math.max(12, Math.min(84, targetChick.x - 6)),
+        y: Math.max(26, Math.min(76, targetChick.y + 2)),
         facingLeft: targetChick.x < prev.x,
       }));
       sound.playClick();
@@ -244,9 +259,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
           // BẮT TRẬT (HỤT) CHÚ GÀ!
           currentAttempt++;
           setJumpStatus('missed');
-          setStatusBannerText(
-            `💨 Ôi trật rồi! Chú gà "${targetChick.name}" vừa lách thoát! Bà cụ nhảy bắt tiếp...`
-          );
+          setStatusBannerText('💨 Hụt rồi! Nhảy bắt tiếp...');
           sound.playWrong();
 
           // Chú gà bị chụp hụt nhảy vọt sang hướng khác
@@ -254,7 +267,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
             prev.map((c) => {
               if (c.id === targetChick.id) {
                 const dodgeX = c.x < 50 ? Math.min(84, c.x + 18) : Math.max(18, c.x - 18);
-                const dodgeY = c.y < 52 ? Math.min(78, c.y + 14) : Math.max(28, c.y - 14);
+                const dodgeY = c.y < 52 ? Math.min(76, c.y + 14) : Math.max(30, c.y - 14);
                 return {
                   ...c,
                   x: dodgeX,
@@ -269,82 +282,79 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
             })
           );
 
-          // Sau 750ms Bà cụ lấy đà nhảy tới chụp chú gà tiếp theo
+          // Sau 700ms lấy đà nhảy tới chụp chú gà tiếp theo
           setTimeout(() => {
             executeJumpAttempt();
-          }, 750);
+          }, 700);
         } else {
-          // BẮT TRÚNG CHÚ GÀ!
+          // BẮT TRÚNG HỌC SINH -> Tắt hoàn toàn thông báo bà lão, chỉ hiển thị Họ và Tên học sinh!
           const latestPool = chicksRef.current;
           const winner =
             latestPool.find((c) => c.id === targetChick.id) ||
             latestPool[Math.floor(Math.random() * latestPool.length)];
 
           setJumpStatus('caught');
+          setStatusBannerText(null); // KHÔNG hiện thông báo bà lão để không che mất họ và tên HS
           setHighlightedChickId(winner.id);
           setCaughtChick(winner);
-          setGrandmaPos({
-            x: Math.max(12, Math.min(82, winner.x - 5)),
-            y: Math.max(24, Math.min(76, winner.y - 2)),
-            facingLeft: false,
-          });
+          setGrandmaPos(getNonOverlappingGrandmaPos(winner.x, winner.y));
           setChicks((prev) => prev.map((c) => ({ ...c, justDodged: false })));
-          setStatusBannerText(`🎯 Bắt trúng chú gà "${winner.name}" rồi! Xin mời em trả lời!`);
 
           setIsCatching(false);
           sound.playCorrect();
           onSelectStudent(winner.name, winner.racerIndex);
         }
-      }, 520);
+      }, 500);
     };
 
     executeJumpAttempt();
   };
 
-  // Click directly on a specific chick -> Grandma jumps toward that chick (can still hit or miss then catch)
+  // Click directly on a specific chick
   const handleManualPickChick = (chick: WanderingChick) => {
     if (isCatching) return;
     setIsCatching(true);
     setCaughtChick(null);
     setHighlightedChickId(chick.id);
     setJumpStatus('jumping');
-    setStatusBannerText(`🦘 Bà cụ nhảy tới chụp chú gà "${chick.name}"...`);
+    setStatusBannerText(null);
     sound.playClick();
 
     setGrandmaPos((prev) => ({
-      x: Math.max(12, Math.min(82, chick.x - 5)),
-      y: Math.max(24, Math.min(76, chick.y - 2)),
+      x: Math.max(12, Math.min(84, chick.x - 6)),
+      y: Math.max(26, Math.min(76, chick.y + 2)),
       facingLeft: chick.x < prev.x,
     }));
 
-    // Có xác suất 35% chụp hụt nhịp đầu rồi chụp trúng ngay nhịp kế tiếp
     const willMissFirst = Math.random() < 0.35;
 
     setTimeout(() => {
       if (willMissFirst) {
         setJumpStatus('missed');
-        setStatusBannerText(`💨 Chú gà "${chick.name}" né rất nhanh! Bà cụ nhảy chụp lần 2...`);
+        setStatusBannerText('💨 Hụt rồi! Nhảy chụp lần 2...');
         sound.playWrong();
 
         setTimeout(() => {
           setJumpStatus('caught');
+          setStatusBannerText(null); // KHÔNG hiện thông báo bà lão
           setCaughtChick(chick);
           setHighlightedChickId(chick.id);
-          setStatusBannerText(`🎯 Đã bắt trúng chú gà "${chick.name}"!`);
+          setGrandmaPos(getNonOverlappingGrandmaPos(chick.x, chick.y));
           setIsCatching(false);
           sound.playCorrect();
           onSelectStudent(chick.name, chick.racerIndex);
-        }, 650);
+        }, 620);
       } else {
         setJumpStatus('caught');
+        setStatusBannerText(null); // KHÔNG hiện thông báo bà lão
         setCaughtChick(chick);
         setHighlightedChickId(chick.id);
-        setStatusBannerText(`🎯 Đã bắt trúng chú gà "${chick.name}"!`);
+        setGrandmaPos(getNonOverlappingGrandmaPos(chick.x, chick.y));
         setIsCatching(false);
         sound.playCorrect();
         onSelectStudent(chick.name, chick.racerIndex);
       }
-    }, 480);
+    }, 460);
   };
 
   const activeRacer = racers[currentRacerIndex] || racers[0];
@@ -354,20 +364,34 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
     ? studentCallCounts[normalizeEntityKey(selectedStudentName)] || 1
     : 0;
 
+  const displayedStudentFullName = caughtChick?.name || selectedStudentName || null;
+
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-amber-400/80 shadow-xl flex flex-col select-none bg-gradient-to-b from-sky-400 via-emerald-500 to-emerald-800">
-      {/* Top Bar: Title + Filter by Team + Catch Chick Button */}
+      {/* Top Bar: Title / Student Full Name + Filter by Team + Catch Chick Button */}
       <div className="relative z-20 bg-slate-950/90 backdrop-blur-md px-2.5 py-1.5 border-b border-amber-400/50 flex flex-wrap items-center justify-between gap-1.5">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-lg sm:text-xl shrink-0">👵🦯🐥</span>
-          <div className="min-w-0">
-            <h3 className="text-[11px] sm:text-xs font-black text-amber-300 uppercase tracking-wider leading-tight truncate">
-              Khu Vực Bà Cụ Chống Gậy Bắt Gà Gọi Tên Học Sinh
-            </h3>
-            <p className="text-[10px] text-emerald-200 font-semibold truncate">
-              Bà cụ chỉ cầm cây gậy • Gà đi chậm rãi • Nhảy chụp có thể trúng hoặc trật
-            </p>
-          </div>
+          {displayedStudentFullName && !isCatching ? (
+            /* Khi đã bắt được học sinh: CHỈ hiển thị Họ và Tên học sinh thật to, rõ ràng, không hiện thông báo bà lão */
+            <div className="flex items-center gap-2 min-w-0 bg-amber-400 text-slate-950 px-3 py-1 rounded-xl shadow-md border border-white">
+              <span className="text-base sm:text-lg shrink-0">🐥</span>
+              <span className="text-xs sm:text-base font-black uppercase tracking-wide truncate">
+                {displayedStudentFullName}
+              </span>
+            </div>
+          ) : (
+            <>
+              <span className="text-lg sm:text-xl shrink-0">👵🦯🐥</span>
+              <div className="min-w-0">
+                <h3 className="text-[11px] sm:text-xs font-black text-amber-300 uppercase tracking-wider leading-tight truncate">
+                  Khu Vực Bắt Gà Gọi Tên Học Sinh
+                </h3>
+                <p className="text-[10px] text-emerald-200 font-semibold truncate">
+                  Bà cụ chỉ cầm cây gậy • Gà đi chậm rãi • Nhảy chụp có thể trúng hoặc trật
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -414,8 +438,8 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
             <Sparkles className={`w-4 h-4 ${isCatching ? 'animate-spin' : ''}`} />
             <span>
               {isCatching
-                ? 'Bà cụ đang nhảy bắt gà...'
-                : selectedStudentName
+                ? 'Đang nhảy bắt gà...'
+                : displayedStudentFullName
                 ? 'Bắt gà gọi tên tiếp'
                 : 'Bắt đầu bắt gà gọi tên'}
             </span>
@@ -465,15 +489,14 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
           <span className="absolute left-[50%] top-[56%] text-xs opacity-60">🍀</span>
         </div>
 
-        {/* Status Banner when Grandma is jumping / missed / caught */}
-        {statusBannerText && (
+        {/* Chỉ hiện thông báo ngắn khi đang chụp HỤT (isCatching).
+            Khi đã bắt được học sinh (!isCatching && displayedStudentFullName) -> TUYỆT ĐỐI KHÔNG hiện thông báo bà lão để không che mất Họ và Tên học sinh! */}
+        {isCatching && statusBannerText && (
           <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
             <div
               className={`px-3 py-1 rounded-full text-[11px] sm:text-xs font-black shadow-lg border flex items-center gap-1.5 whitespace-nowrap ${
                 jumpStatus === 'missed'
                   ? 'bg-rose-600/95 border-rose-200 text-white animate-bounce'
-                  : jumpStatus === 'caught'
-                  ? 'bg-emerald-600/95 border-emerald-200 text-white'
                   : 'bg-amber-400/95 border-white text-slate-950 animate-pulse'
               }`}
             >
@@ -495,38 +518,38 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
               key={chick.id}
               type="button"
               onClick={() => handleManualPickChick(chick)}
-              title={`Bấm để Bà cụ nhảy bắt chú gà: ${chick.name} (${chick.teamName})`}
+              title={chick.name}
               style={{
                 left: `${chick.x}%`,
                 top: `${chick.y}%`,
               }}
               className={`absolute -translate-x-1/2 -translate-y-1/2 transition-all duration-300 ease-linear cursor-pointer group focus:outline-none ${
                 isCaught
-                  ? 'z-30 scale-125'
+                  ? 'z-40 scale-125'
                   : isHighlighted
-                  ? 'z-25 scale-115'
+                  ? 'z-30 scale-115'
                   : 'z-10 hover:scale-110'
               }`}
             >
               {/* Dodge / Miss Indicator */}
-              {chick.justDodged && (
+              {chick.justDodged && isCatching && (
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow border border-white whitespace-nowrap animate-bounce">
                   💨 Né kịp!
                 </div>
               )}
 
-              {/* Student Name Tag Above Chick */}
+              {/* HỌ VÀ TÊN HỌC SINH TRÊN ĐẦU CHÚ GÀ (Không có bất kỳ thông báo bà lão nào che khuất) */}
               <div
-                className={`px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black whitespace-nowrap shadow-md border transition-all mb-0.5 flex items-center gap-1 ${
+                className={`px-2.5 py-0.5 rounded-full font-black whitespace-nowrap shadow-lg border transition-all mb-0.5 flex items-center gap-1.5 ${
                   isCaught
-                    ? 'bg-amber-300 text-slate-950 border-white ring-2 ring-amber-400 scale-105'
+                    ? 'bg-amber-300 text-slate-950 border-2 border-white ring-4 ring-amber-400/80 text-xs sm:text-sm scale-110'
                     : isHighlighted
-                    ? 'bg-rose-500 text-white border-white scale-105'
-                    : 'bg-slate-950/85 text-white border-white/30 group-hover:bg-slate-900'
+                    ? 'bg-rose-500 text-white border-white text-[11px] sm:text-xs scale-105'
+                    : 'bg-slate-950/85 text-white border-white/30 text-[10px] sm:text-[11px] group-hover:bg-slate-900'
                 }`}
               >
                 <span
-                  className="w-2 h-2 rounded-full shrink-0"
+                  className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{ backgroundColor: chick.colorHex }}
                 />
                 <span>{chick.name}</span>
@@ -600,13 +623,13 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
           );
         })}
 
-        {/* Grandma with Cane Character (Bà Cụ Chống Gậy - KHÔNG cầm gì theo bên mình ngoài cây gậy!) */}
+        {/* Grandma with Cane Character (Bà Cụ Chống Gậy - KHÔNG cầm gì ngoài cây gậy và KHÔNG có nhãn chữ thông báo bà lão che mất tên HS) */}
         <div
           style={{
             left: `${grandmaPos.x}%`,
             top: `${grandmaPos.y}%`,
           }}
-          className={`absolute -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none transition-all duration-450 ease-out`}
+          className="absolute -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none transition-all duration-450 ease-out"
         >
           <div
             className={`relative flex flex-col items-center transition-transform duration-300 ${
@@ -617,25 +640,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
                 : ''
             }`}
           >
-            <div
-              className={`px-2 py-0.5 rounded-full text-[10px] font-black shadow-lg mb-0.5 whitespace-nowrap border ${
-                jumpStatus === 'missed'
-                  ? 'bg-rose-600 text-white border-white'
-                  : jumpStatus === 'caught'
-                  ? 'bg-emerald-500 text-slate-950 border-white'
-                  : 'bg-amber-950/90 border-amber-300 text-amber-200'
-              }`}
-            >
-              {jumpStatus === 'jumping'
-                ? '🦘 Bà cụ nhảy chụp gà!'
-                : jumpStatus === 'missed'
-                ? '💨 Bà cụ chụp trật rồi!'
-                : jumpStatus === 'caught'
-                ? '🎯 Bà cụ bắt trúng gà!'
-                : '👵 Bà Cụ Chống Gậy'}
-            </div>
-
-            {/* Custom 2D SVG Illustration of Kind Vietnamese Grandma with ONLY her Walking Cane */}
+            {/* Custom 2D SVG Illustration of Kind Vietnamese Grandma with ONLY her Walking Cane (No overhead text badge so it never covers student names!) */}
             <svg
               viewBox="0 0 96 100"
               className={`w-14 h-14 sm:w-16 sm:h-16 drop-shadow-[0_6px_8px_rgba(0,0,0,0.5)] ${
@@ -648,7 +653,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
               {/* Hair Bun (Búi tóc bạc phía sau) */}
               <circle cx="28" cy="24" r="9" fill="#e2e8f0" stroke="#64748b" strokeWidth="2" />
 
-              {/* Áo bà ba nâu truyền thống (Hơi khom lưng hiền hậu) */}
+              {/* Áo bà ba nâu truyền thống */}
               <path
                 d="M30 42 C24 52, 24 72, 28 84 L58 84 C60 70, 58 52, 50 42 Z"
                 fill="#92400e"
@@ -661,7 +666,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
                 fill="#1e293b"
               />
 
-              {/* Tay phải vươn tự nhiên (KHÔNG cầm giỏ hay nơm, chỉ có bàn tay không) */}
+              {/* Tay phải tự nhiên (KHÔNG cầm giỏ hay nơm) */}
               <path
                 d="M46 48 Q58 52 64 46"
                 fill="none"
@@ -704,7 +709,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
                 strokeLinecap="round"
               />
 
-              {/* Left Arm holding ONLY the Wooden Walking Cane (Cây gậy chống bên mình) */}
+              {/* Left Arm holding ONLY the Wooden Walking Cane */}
               <path
                 d="M36 48 Q50 56 58 54"
                 fill="none"
@@ -714,7 +719,7 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
               />
               <circle cx="59" cy="54" r="4" fill="#fde68a" stroke="#b45309" strokeWidth="1.5" />
 
-              {/* Wooden Walking Cane (Cây gậy trúc/gỗ chống tay) */}
+              {/* Wooden Walking Cane */}
               <path
                 d="M59 50 C65 46, 69 50, 65 55 L63 92"
                 fill="none"
@@ -727,55 +732,44 @@ export const ChickPickerArena: React.FC<ChickPickerArenaProps> = ({
         </div>
       </div>
 
-      {/* Bottom Announced Student Banner:
-          - Khi CHƯA bấm "Bắt đầu bắt gà gọi tên" (selectedStudentName === null): Hiển thị hướng dẫn bấm nút, KHÔNG gọi tên trước!
-          - Khi Bà cụ ĐÃ bắt trúng chú gà: Hiển thị rõ tên học sinh và đội để trả lời câu hỏi. */}
+      {/* Bottom Bar:
+          - Khi bắt được học sinh: CHỈ HIỂN THỊ HỌ VÀ TÊN HỌC SINH (không hiện thông báo bà lão để không che khuất hay rối mắt)
+          - Khi chưa bấm bắt đầu bắt gà: Nhắc bấm nút "Bắt đầu bắt gà gọi tên" */}
       <div className="relative z-20 bg-slate-950/95 border-t border-amber-400/50 px-3 py-1.5 flex items-center justify-between gap-2">
-        {selectedStudentName ? (
+        {displayedStudentFullName ? (
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-sm shrink-0 shadow">
               🐥
             </div>
-            <div className="min-w-0">
-              <div className="text-[10px] text-amber-300 font-bold uppercase leading-none flex items-center gap-1">
-                <UserCheck className="w-3 h-3 text-emerald-400" />
-                <span>Bà cụ đã bắt trúng chú gà (Ngẫu nhiên):</span>
-              </div>
-              <div className="text-xs sm:text-sm font-black text-white truncate flex items-center gap-1.5 flex-wrap">
-                <span className="text-amber-300">
-                  {caughtChick?.name || selectedStudentName}
+            <div className="text-sm sm:text-base font-black text-amber-300 truncate flex items-center gap-2 flex-wrap">
+              <span>{displayedStudentFullName}</span>
+              {gameMode === 'team' && (
+                <span className="text-[11px] sm:text-xs px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
+                  {caughtChick?.teamName || activeRacer?.name}
                 </span>
-                <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
-                  {caughtChick?.teamName || activeRacer?.name || 'Đội thi'}
+              )}
+              {caughtCallCount > 1 && (
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-indigo-950 text-indigo-200 border border-indigo-400/50 font-black">
+                  <Shuffle className="w-2.5 h-2.5" />
+                  <span>Lần {caughtCallCount}</span>
                 </span>
-                {caughtCallCount > 1 && (
-                  <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-indigo-950 text-indigo-200 border border-indigo-400/50 font-black">
-                    <Shuffle className="w-2.5 h-2.5" />
-                    <span>Được gọi lần {caughtCallCount}</span>
-                  </span>
-                )}
-              </div>
+              )}
             </div>
           </div>
         ) : (
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-xl bg-slate-800 border border-amber-400/50 text-amber-300 flex items-center justify-center font-black text-sm shrink-0">
-              👵
+              🐥
             </div>
-            <div className="min-w-0">
-              <div className="text-[10px] text-amber-300 font-bold uppercase leading-none">
-                Chưa gọi tên học sinh:
-              </div>
-              <div className="text-xs sm:text-sm font-extrabold text-slate-200 truncate">
-                Hãy bấm <span className="text-amber-300 font-black">"Bắt đầu bắt gà gọi tên"</span> để Bà cụ nhảy bắt chú gà!
-              </div>
+            <div className="text-xs sm:text-sm font-extrabold text-slate-200 truncate">
+              Bấm <span className="text-amber-300 font-black">"Bắt đầu bắt gà gọi tên"</span> để chọn học sinh
             </div>
           </div>
         )}
 
         <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-400 font-semibold shrink-0">
           <Users className="w-3.5 h-3.5 text-amber-400" />
-          <span>{chicks.length} chú gà trên sân</span>
+          <span>{chicks.length} chú gà</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { sound } from '../../services/soundService';
 import {
   CheckCircle2,
   XCircle,
@@ -10,6 +11,7 @@ import {
   Trophy,
   Clock,
   Shuffle,
+  Volume2,
 } from 'lucide-react';
 
 interface FeedbackModalProps {
@@ -44,6 +46,40 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   onContinue,
 }) => {
   const isFinalQuestion = questionNumber >= totalQuestions;
+  const [isReadingExplanation, setIsReadingExplanation] = useState(false);
+
+  // Tự động đọc văn bản giải thích đáp án để học sinh không cần phải tự đọc
+  useEffect(() => {
+    const statusPrefix = isCorrect ? 'Chính xác!' : 'Chưa đúng!';
+    const speechText = `${statusPrefix} Giải thích: ${explanation}`;
+    const timer = setTimeout(() => {
+      sound.speakVietnameseText(speechText, {
+        interrupt: true,
+        onStart: () => setIsReadingExplanation(true),
+        onEnd: () => setIsReadingExplanation(false),
+      });
+    }, 350);
+
+    return () => {
+      clearTimeout(timer);
+      sound.stopSpeech();
+      setIsReadingExplanation(false);
+    };
+  }, [isCorrect, explanation]);
+
+  const handleReadExplanation = () => {
+    if (isReadingExplanation) {
+      sound.stopSpeech();
+      setIsReadingExplanation(false);
+      return;
+    }
+    const statusPrefix = isCorrect ? 'Chính xác!' : 'Chưa đúng!';
+    sound.speakVietnameseText(`${statusPrefix} Giải thích: ${explanation}`, {
+      interrupt: true,
+      onStart: () => setIsReadingExplanation(true),
+      onEnd: () => setIsReadingExplanation(false),
+    });
+  };
 
   return (
     <div className="absolute inset-0 z-40 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
@@ -150,10 +186,24 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
             </div>
           )}
 
-          {/* Explanation Card */}
+          {/* Explanation Card with Voice Read Button */}
           <div className="bg-black/40 rounded-xl p-3 text-left border border-white/10 mb-3">
-            <div className="text-[10px] sm:text-xs uppercase font-bold text-amber-400 mb-1">
-              💡 Giải thích chi tiết kiến thức bài học:
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="text-[10px] sm:text-xs uppercase font-bold text-amber-400">
+                💡 Giải thích chi tiết kiến thức bài học:
+              </div>
+              <button
+                type="button"
+                onClick={handleReadExplanation}
+                className={`px-2 py-0.5 rounded-lg text-[10px] sm:text-xs font-black flex items-center gap-1 cursor-pointer border ${
+                  isReadingExplanation
+                    ? 'bg-emerald-400 text-slate-950 border-white animate-pulse'
+                    : 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-400/40'
+                }`}
+              >
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>{isReadingExplanation ? 'Đang đọc...' : 'Nghe đọc'}</span>
+              </button>
             </div>
             <p className="text-xs sm:text-sm leading-relaxed text-slate-200">{explanation}</p>
           </div>
@@ -161,7 +211,10 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
         {/* Action Button: Either advance to next question OR finish the single-pass play session */}
         <button
-          onClick={onContinue}
+          onClick={() => {
+            sound.stopSpeech();
+            onContinue();
+          }}
           className="w-full py-3 sm:py-3.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm sm:text-base flex items-center justify-center gap-2 shadow-xl shadow-amber-400/30 transform hover:scale-101 active:scale-98 transition-all cursor-pointer shrink-0"
         >
           {isFinalQuestion ? (

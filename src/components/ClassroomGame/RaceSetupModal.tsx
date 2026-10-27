@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameMode, Question, RaceSetupConfig } from '../../types';
 import { useGameStore } from '../../store/gameStore';
+import { sound } from '../../services/soundService';
 import { extractQuizWithGemini, getStoredApiKey, normalizeQuestionVisuals } from '../../services/geminiClientService';
 import {
   ALLOWED_SUBJECTS,
@@ -52,6 +53,7 @@ import {
   EyeOff,
   Check,
   Layers,
+  Volume2,
 } from 'lucide-react';
 
 interface RaceSetupModalProps {
@@ -970,13 +972,26 @@ export const RaceSetupModal: React.FC<RaceSetupModalProps> = ({
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] font-bold text-slate-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded-md">
-                          {showQImg
-                            ? '🖼️ Minh họa trong câu hỏi'
-                            : uniformOpts
-                            ? '🖼️ Minh họa trong 4 đáp án'
-                            : '📝 Câu hỏi kiến thức'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              sound.speakQuestionAndOptions(idx + 1, q.question, q.options)
+                            }
+                            title="Nghe máy đọc câu hỏi và 4 đáp án"
+                            className="px-2 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-black flex items-center gap-1 cursor-pointer shadow"
+                          >
+                            <Volume2 className="w-3 h-3" />
+                            <span>Nghe đọc</span>
+                          </button>
+                          <span className="text-[10px] font-bold text-slate-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded-md">
+                            {showQImg
+                              ? '🖼️ Minh họa trong câu hỏi'
+                              : uniformOpts
+                              ? '🖼️ Minh họa trong 4 đáp án'
+                              : '📝 Câu hỏi kiến thức'}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="text-white font-extrabold text-xs sm:text-sm leading-snug">

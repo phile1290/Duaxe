@@ -379,13 +379,26 @@ export const AiQuizGenerator: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] font-bold text-slate-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded-md">
-                        {showQImg
-                          ? '🖼️ Hình trong câu hỏi'
-                          : uniformOpts
-                          ? '🖼️ Hình trong 4 đáp án'
-                          : '📝 Câu hỏi kiến thức'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            sound.speakQuestionAndOptions(qIdx + 1, q.question, q.options)
+                          }
+                          title="Nghe máy đọc câu hỏi và 4 đáp án"
+                          className="px-2.5 py-0.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer shadow"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                          <span>Nghe đọc</span>
+                        </button>
+                        <span className="text-[11px] font-bold text-slate-300 bg-slate-900/90 border border-slate-700 px-2 py-0.5 rounded-md">
+                          {showQImg
+                            ? '🖼️ Hình trong câu hỏi'
+                            : uniformOpts
+                            ? '🖼️ Hình trong 4 đáp án'
+                            : '📝 Câu hỏi kiến thức'}
+                        </span>
+                      </div>
                     </div>
 
                     <h4 className="text-sm sm:text-base font-bold text-white leading-snug">

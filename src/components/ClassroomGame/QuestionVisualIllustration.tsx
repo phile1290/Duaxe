@@ -2408,7 +2408,11 @@ export const QuestionVisualIllustration: React.FC<QuestionVisualIllustrationProp
 
   const qText = question.question || '';
   const rawVisualData = (question.visualData || '').trim();
-  const combinedQuestionContext = `${qText} ${rawVisualData} ${question.visualKey || ''}`;
+  const correctOpt =
+    Array.isArray(question.options) && typeof question.correctIndex === 'number'
+      ? question.options[question.correctIndex] || ''
+      : '';
+  const combinedQuestionContext = `${qText} ${rawVisualData} ${question.visualKey || ''} ${correctOpt}`;
 
   const containerHeight = compact ? 'h-24 sm:h-28' : 'h-32 sm:h-36';
 
@@ -2493,10 +2497,11 @@ export const QuestionVisualIllustration: React.FC<QuestionVisualIllustrationProp
     );
   }
 
-  // 2. Kiểm tra trong thư viện Vector SVG chuyên biệt (Tin học: Word, PowerPoint, Excel, Paint, CPU, Màn hình, Chuột, Bàn phím; Hình học; Khoa học...)
+  // 2. Kiểm tra trong thư viện Vector SVG chuyên biệt (Công nghệ, Tin học, Kỹ năng số, AI, Hình học, Khoa học...)
   const semanticTopic =
     detectSemanticTopicKey(qText, question.visualKey) ||
-    detectSemanticTopicKey(rawVisualData, question.visualKey);
+    detectSemanticTopicKey(rawVisualData, question.visualKey) ||
+    detectSemanticTopicKey(correctOpt, question.visualKey);
 
   if (semanticTopic) {
     return (

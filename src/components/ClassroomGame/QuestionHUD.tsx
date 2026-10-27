@@ -6,7 +6,8 @@ import {
   getUniformOptionVisuals,
   resolveVisualDisplayMode,
 } from './QuestionVisualIllustration';
-import { Timer, Flame, UserCheck, Clock, Shuffle } from 'lucide-react';
+import { sound } from '../../services/soundService';
+import { Timer, Flame, Clock, Shuffle, Volume2, VolumeX } from 'lucide-react';
 
 interface QuestionHUDProps {
   question: Question;
@@ -31,20 +32,30 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   onAnswer,
   combo,
 }) => {
-  // Thời gian 1 câu hỏi là 1 phút (60 giây) để học sinh thoải mái đọc kỹ câu hỏi và 4 đáp án
+  // Thời gian 1 câu hỏi là 1 phút (60 giây) để học sinh thoải mái đọc/nghe kỹ câu hỏi và 4 đáp án
   const totalTime = 60;
   const [timeLeft, setTimeLeft] = useState(totalTime);
   const [elapsedSec, setElapsedSec] = useState(0);
+  const [isSpeakingText, setIsSpeakingText] = useState(false);
+
   const answeredRef = React.useRef(false);
   const startTimeRef = React.useRef<number>(Date.now());
   const onAnswerRef = React.useRef(onAnswer);
   onAnswerRef.current = onAnswer;
 
+  // Tự động đọc to, rõ ràng, tốc độ trung bình toàn bộ văn bản Câu hỏi và 4 Đáp án A, B, C, D ngay khi hiển thị câu hỏi
   useEffect(() => {
     answeredRef.current = false;
     setTimeLeft(totalTime);
     setElapsedSec(0);
     startTimeRef.current = Date.now();
+
+    const speechTimer = setTimeout(() => {
+      sound.speakQuestionAndOptions(questionNumber, question.question, question.options, {
+        onStart: () => setIsSpeakingText(true),
+        onEnd: () => setIsSpeakingText(false),
+      });
+    }, 180);
 
     const countdownInterval = setInterval(() => {
       setTimeLeft((prev) => Math.max(0, prev - 1));
@@ -56,14 +67,18 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
     }, 100);
 
     return () => {
+      clearTimeout(speechTimer);
       clearInterval(countdownInterval);
       clearInterval(stopwatchInterval);
+      sound.stopSpeech();
+      setIsSpeakingText(false);
     };
   }, [question.id, questionNumber]);
 
   useEffect(() => {
     if (timeLeft === 0 && !answeredRef.current) {
       answeredRef.current = true;
+      sound.stopSpeech();
       const timeoutTimer = setTimeout(() => {
         onAnswerRef.current(-1, totalTime);
       }, 0);
@@ -74,9 +89,32 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
   const handleSelectAnswer = (optionIndex: number) => {
     if (answeredRef.current) return;
     answeredRef.current = true;
+    sound.stopSpeech();
+    setIsSpeakingText(false);
     const rawElapsed = (Date.now() - startTimeRef.current) / 1000;
     const finalSeconds = Math.max(0.1, Math.min(totalTime, Math.round(rawElapsed * 10) / 10));
     onAnswer(optionIndex, finalSeconds);
+  };
+
+  const handleReadFullQuestionAndOptions = () => {
+    if (isSpeakingText) {
+      sound.stopSpeech();
+      setIsSpeakingText(false);
+      return;
+    }
+    sound.speakQuestionAndOptions(questionNumber, question.question, question.options, {
+      onStart: () => setIsSpeakingText(true),
+      onEnd: () => setIsSpeakingText(false),
+    });
+  };
+
+  const handleReadSingleOption = (e: React.MouseEvent, optLabel: string, optText: string) => {
+    e.stopPropagation();
+    sound.speakVietnameseText(`Đáp án ${optLabel}: ${optText}`, {
+      interrupt: true,
+      onStart: () => setIsSpeakingText(true),
+      onEnd: () => setIsSpeakingText(false),
+    });
   };
 
   useEffect(() => {
@@ -189,7 +227,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
           />
         </div>
 
-        {/* Active Student / Team Turn Status Banner */}
+        {/* Active Student Full Name Display (Khi bắt được học sinh nào thì chỉ hiển thị rõ Họ và Tên học sinh) */}
         <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl p-2">
           <div
             className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-base sm:text-lg shrink-0 shadow font-black text-slate-950 ring-1 ring-white/20"
@@ -205,8 +243,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             )}
             {selectedStudentName ? (
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs font-black">
-                  <UserCheck className="w-3.5 h-3.5" />
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow">
                   <span>🐥 {selectedStudentName}</span>
                 </span>
                 <span className="text-xs font-extrabold text-white truncate">
@@ -222,7 +259,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
               </div>
             ) : (
               <div className="text-xs font-bold text-amber-300 leading-snug">
-                👵 Chưa gọi tên học sinh — Hãy bấm{' '}
+                Chưa gọi tên học sinh — Hãy bấm{' '}
                 <span className="underline font-black">"Bắt đầu bắt gà gọi tên"</span> ở khung bên
                 phải!
               </div>
@@ -231,7 +268,7 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         </div>
       </div>
 
-      {/* 2. Question Content Area (Cỡ chữ lớn, rõ ràng) */}
+      {/* 2. Question Content Area (Cỡ chữ lớn, rõ ràng + Tự động đọc văn bản + Nút nghe đọc lại) */}
       <div
         className={`flex flex-col gap-2 bg-slate-950/85 border-2 ${
           question.isAdvanced || question.difficulty === 'nang_cao'
@@ -239,18 +276,54 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
             : 'border-slate-800'
         } rounded-2xl p-3 sm:p-3.5 shrink-0`}
       >
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-xs sm:text-sm bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-lg shrink-0">
-            CÂU HỎI {questionNumber}
-          </span>
-          {(question.isAdvanced || question.difficulty === 'nang_cao') && (
-            <span className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black px-2.5 py-0.5 rounded-lg shrink-0 shadow">
-              🌟 CÂU HỎI NÂNG CAO
+        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs sm:text-sm bg-amber-400 text-slate-950 font-black px-2.5 py-0.5 rounded-lg shrink-0">
+              CÂU HỎI {questionNumber}
             </span>
-          )}
+            {(question.isAdvanced || question.difficulty === 'nang_cao') && (
+              <span className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black px-2.5 py-0.5 rounded-lg shrink-0 shadow">
+                🌟 CÂU HỎI NÂNG CAO
+              </span>
+            )}
+          </div>
+
+          {/* Nút Đọc Văn Bản Câu Hỏi & 4 Đáp Án (Giọng đọc to, rõ ràng, tốc độ trung bình) */}
+          <button
+            type="button"
+            onClick={handleReadFullQuestionAndOptions}
+            title="Máy tự động đọc to, rõ ràng câu hỏi và 4 đáp án (tốc độ trung bình)"
+            className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer shadow border ${
+              isSpeakingText
+                ? 'bg-emerald-500 text-slate-950 border-white animate-pulse'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400'
+            }`}
+          >
+            {isSpeakingText ? (
+              <>
+                <Volume2 className="w-4 h-4 animate-bounce" />
+                <span>Đang đọc văn bản... (Bấm để dừng)</span>
+              </>
+            ) : (
+              <>
+                <Volume2 className="w-4 h-4" />
+                <span>Đọc câu hỏi & đáp án</span>
+              </>
+            )}
+          </button>
         </div>
 
-        <h2 className="text-base sm:text-lg xl:text-xl font-black text-white leading-snug break-words">
+        <h2
+          onClick={() =>
+            sound.speakVietnameseText(`Câu hỏi số ${questionNumber}: ${question.question}`, {
+              interrupt: true,
+              onStart: () => setIsSpeakingText(true),
+              onEnd: () => setIsSpeakingText(false),
+            })
+          }
+          title="Bấm vào văn bản câu hỏi để nghe máy đọc lại câu hỏi"
+          className="text-base sm:text-lg xl:text-xl font-black text-white leading-snug break-words cursor-pointer hover:text-amber-200 transition-colors"
+        >
           {question.question}
         </h2>
 
@@ -263,7 +336,8 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
 
       {/* 3. Các Đáp Án A, B, C, D Đặt Dọc Từ Trên Xuống Ở Cột Trái 1/3:
           - Tăng cỡ chữ nội dung đáp án (text-sm sm:text-base xl:text-lg)
-          - Không cắt chữ (không dùng line-clamp), hiển thị đầy đủ các đáp án dài từ trên xuống dưới */}
+          - Không cắt chữ (không dùng line-clamp), hiển thị đầy đủ các đáp án dài từ trên xuống dưới
+          - Có nút loa đọc riêng từng đáp án để học sinh không cần phải tự đọc */}
       <div
         className={`flex-1 flex flex-col justify-between ${
           uniformOptionVisuals ? 'grid grid-cols-2 gap-2' : 'gap-2 sm:gap-2.5'
@@ -272,10 +346,17 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
         {question.options.map((opt, idx) => {
           const col = optionColors[idx];
           return (
-            <button
+            <div
               key={idx}
-              type="button"
               onClick={() => handleSelectAnswer(idx)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleSelectAnswer(idx);
+                }
+              }}
               className={`group w-full flex flex-col justify-center gap-1.5 p-2.5 sm:p-3.5 rounded-2xl ${col.bg} border-2 ${col.border} text-white font-bold text-left transition-all active:scale-[0.98] shadow-lg cursor-pointer`}
             >
               {uniformOptionVisuals && (
@@ -289,17 +370,29 @@ export const QuestionHUD: React.FC<QuestionHUDProps> = ({
                 />
               )}
 
-              <div className="flex items-start gap-2.5 w-full">
-                <span
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${col.badge} flex items-center justify-center text-sm sm:text-base font-black shrink-0 shadow border border-white/20 mt-0.5`}
+              <div className="flex items-start justify-between gap-2 w-full">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                  <span
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl ${col.badge} flex items-center justify-center text-sm sm:text-base font-black shrink-0 shadow border border-white/20 mt-0.5`}
+                  >
+                    {col.label}
+                  </span>
+                  <span className="text-sm sm:text-base xl:text-lg flex-1 font-extrabold leading-snug break-words">
+                    {opt}
+                  </span>
+                </div>
+
+                {/* Nút loa đọc riêng văn bản của từng đáp án */}
+                <button
+                  type="button"
+                  onClick={(e) => handleReadSingleOption(e, col.label, opt)}
+                  title={`Nghe đọc đáp án ${col.label}`}
+                  className="p-1.5 rounded-xl bg-black/25 hover:bg-black/45 text-white/90 hover:text-amber-300 border border-white/20 shrink-0 transition-colors cursor-pointer"
                 >
-                  {col.label}
-                </span>
-                <span className="text-sm sm:text-base xl:text-lg flex-1 font-extrabold leading-snug break-words">
-                  {opt}
-                </span>
+                  <Volume2 className="w-4 h-4" />
+                </button>
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
